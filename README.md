@@ -18,14 +18,14 @@ This Unity game is a narrative strategy experience where the player is a 10th ge
 - Card data stored in ScriptableObject assets.
 - Scene currently supports a hardcoded 3-card draw for UI hookup testing.
 - Deck will expand beyond 3 cards as development continues.
-- **Stage 1 LLM:** `OllamaClient` + `TarotCardInterpreter` call Ollama with the first N cards (name, theme, moral) and return a short positive reading for testing. Demon and judge agents are not wired yet.
+- **Stage 1 LLM:** `OllamaClient` + `TarotReadingSmokeTest` (positive prompt dev harness) and `DemonTarotReader` (negative demon prompt). Judge/ruling not wired yet.
 
 ## Ollama (local LLM) — test setup
 1. Install [Ollama](https://ollama.com) and run `ollama serve` (default `http://127.0.0.1:11434`).
 2. Pull a model, e.g. `ollama pull llama3.2` (or set `OllamaClient`’s model name to match whatever you installed).
-3. In Unity, add an `OllamaClient` component and a `TarotCardInterpreter` component (e.g. on `GameManager` or an empty test object).
-4. Assign the same `TarotCards` asset as `TarotCardInterpreter.tarotDatabase`, link `ollama` to the `OllamaClient`, optionally assign a `TMP_Text` for output.
-5. Enter Play Mode and press **I** (default) to request an interpretation, or enable **Interpret On Start** on `TarotCardInterpreter` for an automatic request.
+3. Add `OllamaClient`. Optionally add `TarotReadingSmokeTest` and/or `DemonTarotReader` (same GameObject or separate).
+4. Assign **`TarotCardPull`** on both `TarotReadingSmokeTest` and `DemonTarotReader`. Link **Ollama** to `OllamaClient`; assign `TMP_Text` if desired. **`TarotPullSpreadBuilder`** reads slot data from `TarotCardPull` (`cardDescriptions`, `cardMorality`, `cardImages` length); theme strings come from **`tarotDatabase.cards[i]`** when indices match the pull. No edits required on `TarotCardPull` itself.
+5. Play Mode: **I** = positive smoke-test reading; **D** = demon reading (defaults). Or enable **Request On Start** on either component. Uncheck **Listen For Hotkey** if you only want UI/button triggers.
 
 ## Planned AI Architecture (Ollama)
 - Local LLM runtime via Ollama

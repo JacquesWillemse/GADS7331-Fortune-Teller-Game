@@ -50,7 +50,7 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
 
 ### Milestone 2 - LLM Integration (Ollama)
 - Build `OllamaClient` service in Unity (initial version done: `/api/generate`).
-- `TarotCardInterpreter` smoke-test for positive reading from drawn card metadata.
+- `TarotReadingSmokeTest` for positive prompt harness; `DemonTarotReader` for inverted demon prompt (same card slice).
 - Build prompt templates:
   - `PlayerReaderPrompt`
   - `DemonReaderPrompt`

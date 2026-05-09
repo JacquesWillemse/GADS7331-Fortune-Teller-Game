@@ -11,6 +11,7 @@ public class TarotCardPull : MonoBehaviour
     //CardData
     public TMP_Text[] cardDescriptions;
     public Image[] cardImages;
+    public TarotMoral[] cardMorality;
 
     private int cardDrawsAmount = 3;
     private int cardCount = 0;
@@ -23,7 +24,7 @@ public class TarotCardPull : MonoBehaviour
         CardPull();
     }
 
-    // Update is called once per frame
+    // Update is called once before the first execution of Update after MonoBehaviour is created
     void Update()
     {
         
@@ -31,13 +32,19 @@ public class TarotCardPull : MonoBehaviour
 
     private void CardPull()
     {
-        TarotCardData card = tarotDatabase.cards[0];
+        TarotCardData card;
         for (int i = 0; i < cardDrawsAmount; i++)
         {
             card = tarotDatabase.cards[i];
             cardDescriptions[i].text = card.cardName;
             cardImages[i] = card.tarotCardImage;
+            cardMorality[i] = card.cardMoral;
             Debug.Log(card.cardTheme);
         }
+    }
+
+    private int Random()
+    {
+        return 1;
     }
 }

@@ -43,3 +43,19 @@
 ### How to validate
 - Ollama running locally with a model matching `OllamaClient.model`.
 - Scene: add components + references; press **I** or use interpret-on-start; confirm Console / UI shows a coherent positive reading.
+
+### Fix: Input System only project
+- Replaced legacy `Input.GetKeyDown` with `UnityEngine.InputSystem.Keyboard` and `Key` binding so Play Mode works when **Active Input Handling** is set to **Input System Package** (or Both).
+
+### Tarot interpretation prompt (Stage 1)
+- Tightened positive-only tone (no ominous or negative predictions for this role).
+- Customer-facing reply must not name cards, themes, or moral labels; model uses spread only as private context.
+- Output tuning (2–4 sentences): allow **one or two** imagery hooks from the spread (no card-by-card recap, no theme keywords); optional sparing “you”; a sharp hook may echo peril, then lines resolve toward net hopeful steadiness.
+
+### LLM spread source → TarotCardPull (no edits to user script)
+- `TarotReadingSmokeTest` / `DemonTarotReader` reference **`TarotCardPull`**. **`TarotPullSpreadBuilder`** reads **`cardDescriptions`**, **`cardMorality`**, and caps by **`cardImages`** length; theme text uses **`tarotDatabase.cards[i]`** when parallel to the pull. **`TarotCardPull.cs`** left as the author wrote it.
+
+### Rename + demon reader
+- Renamed `TarotCardInterpreter` → `TarotReadingSmokeTest` (same script GUID preserved for Unity references). Serialized fields migrated with `FormerlySerializedAs` where renamed.
+- Added `DemonTarotReader` (default hotkey **D**): same spread slice and structural rules, inverted to net harmful/doom-laden output.
+- Shared spread lines in `TarotLlmSpreadContext` for prompt consistency.
