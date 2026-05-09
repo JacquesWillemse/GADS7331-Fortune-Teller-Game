@@ -55,6 +55,10 @@
 ### LLM spread source → TarotCardPull (no edits to user script)
 - `TarotReadingSmokeTest` / `DemonTarotReader` reference **`TarotCardPull`**. **`TarotPullSpreadBuilder`** reads **`cardDescriptions`**, **`cardMorality`**, and caps by **`cardImages`** length; theme text uses **`tarotDatabase.cards[i]`** when parallel to the pull. **`TarotCardPull.cs`** left as the author wrote it.
 
+### Demon prompt iteration
+- Rewrote default demon prompt: carnival-bound predator voice, verdict-like lines, moral-lean handling (Good twist harder / Neutral cruel fate / Bad inevitable doom).
+- Added Inspector **Additional Demon Instructions** (`DemonTarotReader`) for tuning without code edits.
+
 ### Rename + demon reader
 - Renamed `TarotCardInterpreter` → `TarotReadingSmokeTest` (same script GUID preserved for Unity references). Serialized fields migrated with `FormerlySerializedAs` where renamed.
 - Added `DemonTarotReader` (default hotkey **D**): same spread slice and structural rules, inverted to net harmful/doom-laden output.

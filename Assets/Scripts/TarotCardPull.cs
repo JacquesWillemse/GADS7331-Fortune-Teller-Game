@@ -18,7 +18,7 @@ public class TarotCardPull : MonoBehaviour
     private int cardDrawsAmount = 3;
     private int cardCount = 0;
 
-    public List<int> cardPulls = new List<int>();
+    private List<int> cardPulls = new List<int>();
     private int randomIndex;
 
 

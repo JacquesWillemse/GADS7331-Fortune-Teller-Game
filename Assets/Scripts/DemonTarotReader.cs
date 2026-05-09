@@ -18,6 +18,10 @@ public class DemonTarotReader : MonoBehaviour
     [SerializeField] private TMP_Text demonOutput;
     [SerializeField] private bool logToConsole = true;
 
+    [Header("Prompt tuning (optional)")]
+    [Tooltip("Appended to the demon prompt so you can iterate in the Inspector without code changes.")]
+    [SerializeField, TextArea(3, 12)] private string additionalDemonInstructions = "";
+
     private bool _requestInFlight;
     private readonly List<TarotCardData> _spreadBuffer = new List<TarotCardData>();
 
@@ -75,7 +79,7 @@ public class DemonTarotReader : MonoBehaviour
         if (ollama == null || cards == null || cards.Count == 0)
             return;
 
-        string prompt = BuildDemonPrompt(cards);
+        string prompt = BuildDemonPrompt(cards, additionalDemonInstructions);
         _requestInFlight = true;
         SetOutput("(Summoning demon reading…)");
 
@@ -96,21 +100,31 @@ public class DemonTarotReader : MonoBehaviour
             });
     }
 
-    private static string BuildDemonPrompt(IReadOnlyList<TarotCardData> cards)
+    private static string BuildDemonPrompt(IReadOnlyList<TarotCardData> cards, string extraInstructions)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("You are a cruel carnival demon speaking through a fortune-teller booth. Give a brief curse-as-prophecy: net bleak, corrupting, humiliating.");
-        sb.AppendLine("Tone: cold, theatrical malice. No jokes that soften the blow. No redemption arc. No offering hope or practical advice.");
+        sb.AppendLine("ROLE");
+        sb.AppendLine("You are the carnival's bound demon: honey on the tongue, rot underneath. You speak as a rival fortune—one that wants the listener's confidence to curdle. This is a curse dressed as a reading, not a debate.");
         sb.AppendLine();
-        sb.AppendLine("Below is PRIVATE context (imagery + symbolic weight). Mine it for one or two hooks only.");
-        sb.AppendLine("OUTPUT rules:");
-        sb.AppendLine("- Length: 2–4 short sentences.");
-        sb.AppendLine("- Imagery: echo **at most one or two** concrete tensions from the private titles (hunger, vanity, violence in a civil place—whatever fits). Lean into ruin, shame, loss of control, or doom; do **not** recap every card.");
-        sb.AppendLine("- Do NOT list cards (no \"first card\", \"second card\", \"the cards show\"). Do NOT paste full card titles as captions.");
-        sb.AppendLine("- Do NOT use the words Greed, Vanity, Chaos, Power, or moral-label jargon.");
-        sb.AppendLine("- Land on peril, collapse, or bitter irony—no comforting pivot.");
-        sb.AppendLine("- Second person (\"you\") is allowed **sparingly** if it sharpens the hook; otherwise stay third person about fate decaying.");
+        sb.AppendLine("VOICE");
+        sb.AppendLine("- 2–4 short sentences. Verdict energy: each line should land like a slap, not a paragraph.");
+        sb.AppendLine("- Pick **one or two** grotesque hooks from the private symbols below (appetite, vanity, violence where it shouldn’t be, control slipping). Do **not** walk card-by-card.");
+        sb.AppendLine("- Do NOT name tarot, cards, spreads, or \"the first card.\" Do NOT quote full card titles as titles.");
+        sb.AppendLine("- Do NOT output the theme labels Greed, Vanity, Chaos, Power — use plain cruel synonyms if needed.");
+        sb.AppendLine("- No comfort, no warnings-as-care, no psychology lecture, no punchline that forgives.");
+        sb.AppendLine("- End on ruin: shame, accident of desire, collapse, exposure—whatever the symbols demand.");
         sb.AppendLine();
+        sb.AppendLine("MORAL WEIGHT (from private context lines)");
+        sb.AppendLine("- Where moral lean reads Good: twist harder—make virtue look like bait.");
+        sb.AppendLine("- Neutral: fate feels unfair and hungry.");
+        sb.AppendLine("- Bad: doom should feel close, deserved, or inevitable.");
+        sb.AppendLine();
+        if (!string.IsNullOrWhiteSpace(extraInstructions))
+        {
+            sb.AppendLine("DESIGNER EXTRA RULES (follow strictly):");
+            sb.AppendLine(extraInstructions.Trim());
+            sb.AppendLine();
+        }
         TarotLlmSpreadContext.AppendSpreadLines(sb, cards);
         return sb.ToString();
     }
