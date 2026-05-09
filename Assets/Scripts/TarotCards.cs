@@ -11,6 +11,6 @@ public class TarotCards : ScriptableObject
 public class TarotCardData
 {
     public string cardName;
-    public string description;
+    public string cardTheme;
     public Image tarotCardImage;
 }
