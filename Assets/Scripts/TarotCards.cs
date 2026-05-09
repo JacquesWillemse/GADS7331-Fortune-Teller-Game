@@ -7,10 +7,19 @@ public class TarotCards : ScriptableObject
 {
     public List<TarotCardData> cards;
 }
+
+public enum TarotMoral
+{
+    Good,
+    Neutral,
+    Bad
+}
+
 [System.Serializable]
 public class TarotCardData
 {
     public string cardName;
     public string cardTheme;
+    public TarotMoral cardMoral;
     public Image tarotCardImage;
 }

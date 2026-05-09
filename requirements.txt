@@ -1,0 +1,51 @@
+# Fortune Teller Game Requirements Baseline
+# Date: 2026-05-09
+
+[Game Design Requirements]
+- Theme: carnival fortune telling with supernatural demon interference
+- Narrative stake: player must keep carnival alive or face catastrophic consequence
+- Card system:
+  - Deck target size: 30 cards
+  - Starter set: 10 cards
+  - Card fields: title, image, description, hidden theme, optional bias
+  - Hidden themes: Greed, Vanity, Chaos, Power
+- Reading duel:
+  - Player gives positive interpretation
+  - Demon AI gives negative interpretation
+  - If player response is negative, demon agrees and judge phase is skipped
+- Judge system:
+  - Judge AI receives cards + player response + demon response + customer context
+  - Judge returns winner and rationale
+
+[Gameplay Systems]
+- Fortune teller reading loop
+- Carnival management loop
+- Demon dance battle loop (DDR style)
+- Resource model:
+  - gullible customers
+  - money quota
+  - reputation
+  - magic energy
+  - time
+- Optional helper systems:
+  - card hint book
+  - customer interviews before readings
+
+[Technical Requirements]
+- Engine: Unity
+- AI Runtime: Ollama (local LLM inference)
+- AI Roles: Demon Interpreter, Judge Arbiter (and optional player-side assistant)
+- Networking: HTTP integration from Unity to Ollama API
+- Reliability:
+  - request timeout
+  - retry policy
+  - safe fallback output
+- UX:
+  - loading indicator while waiting for LLM response
+  - deterministic parse format for model output
+
+[Quality Requirements]
+- Clear role-constrained prompts to minimize AI drift
+- Logging for every interpretation round
+- Reproducible test scenarios using fixed card sets
+- Modular architecture to support future card and story expansion

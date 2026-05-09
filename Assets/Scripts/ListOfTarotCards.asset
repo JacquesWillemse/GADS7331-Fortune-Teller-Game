@@ -13,27 +13,35 @@ MonoBehaviour:
   m_Name: ListOfTarotCards
   m_EditorClassIdentifier: Assembly-CSharp::TarotCards
   cards:
-  - cardName: 'Rat jumping into a deep-fry after a piece of cheese '
+  - cardName: 'Rat jumping into a deep-fry for a piece of cheese '
     cardTheme: Greed
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
   - cardName: Woman with an unsustainable head to mohawk ratio
     cardTheme: Vanity
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
   - cardName: 'Heavy-Weight wrestling match in a 3 Star Michelin restaurant '
     cardTheme: Chaos
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
   - cardName: 'Horse shooting a farmer with a broken leg '
     cardTheme: Power
+    cardMoral: 0
     tarotCardImage: {fileID: 0}
   - cardName: 'Waxing a grizzly bear '
     cardTheme: Vanity
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
   - cardName: 20 Succulent Chinese meals for 1
     cardTheme: Greed
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
   - cardName: Holding the Remote Control in a large family
     cardTheme: Power
+    cardMoral: 1
     tarotCardImage: {fileID: 0}
-  - cardName: Marching for a cold snap in a retirement home
+  - cardName: Wishing for a cold snap in a retirement home
     cardTheme: Chaos
+    cardMoral: 2
     tarotCardImage: {fileID: 0}
