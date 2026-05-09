@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 public class TarotCardPull : MonoBehaviour
 {
@@ -15,6 +17,9 @@ public class TarotCardPull : MonoBehaviour
 
     private int cardDrawsAmount = 3;
     private int cardCount = 0;
+
+    public List<int> cardPulls = new List<int>();
+    private int randomIndex;
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -35,7 +40,7 @@ public class TarotCardPull : MonoBehaviour
         TarotCardData card;
         for (int i = 0; i < cardDrawsAmount; i++)
         {
-            card = tarotDatabase.cards[i];
+            card = tarotDatabase.cards[RandomCard()];
             cardDescriptions[i].text = card.cardName;
             cardImages[i] = card.tarotCardImage;
             cardMorality[i] = card.cardMoral;
@@ -43,8 +48,14 @@ public class TarotCardPull : MonoBehaviour
         }
     }
 
-    private int Random()
+    private int RandomCard()
     {
-        return 1;
+        do
+        {
+            randomIndex = UnityEngine.Random.Range(0, cardCount);
+        }
+        while (cardPulls.Contains(randomIndex));
+        cardPulls.Add(randomIndex);
+        return randomIndex;
     }
 }
