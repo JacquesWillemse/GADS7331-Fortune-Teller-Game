@@ -70,6 +70,17 @@
 - Demon prompt simplified again to match early “3 lines + verdict” intent: **3 sentences** = one per private spread line (any order), classic booth tone; **sentence 4** = short decisive closing curse only. Stripped long fuse/hook/no-echo scaffolding that was steering the model wrong.
 - Demon prompt fix: model was restaging card jokes (remote, hair, kitchen). Body lines must curse from **Theme + Moral lean** only; strict ban on recognizable title props/scenes in sentences 1–3; sentence 4 remains overall doom hammer.
 - Demon prompt: **gender-neutral** output — no she/her/he/him or gendered nouns for the querent; card gender in titles must not be projected onto the listener (`they/them`, `one`, `you/your`, or impersonal phrasing).
+
+### Duel pipeline (player → gate → demon → judge)
+- Added `DemonTarotPrompts` (shared demon reading + gate prompts), `TarotJudgePrompts`, `TarotLlmJsonHelpers` (gate/judge JSON DTOs + extract), `TarotReadingDuelPipeline` (coroutine chain, UnityEvents).
+- `OllamaClient.GenerateWait` for sequential LLM steps.
+- `DemonTarotReader` now calls `DemonTarotPrompts.BuildReadingPrompt` (single source of truth).
+- `TarotReadingDuelPipeline`: optional **Log Status To Console**; default **Log Gate And Judge To Console** logs `[Duel][Gate]` / accept-skip / `[Duel][Judge]` lines.
+- Demon **gate** prompt tightened: agree only on net cruel/harmful readings; hopeful reframes (vanity/power named but landing on hope) → demon does **not** agree. **GameplayHotkeyGuard**: no I/D/J while `TMP_InputField` focused; Smoke/Demon **Listen For Hotkey** default **off**.
+- Added `DemonGatePositiveHeuristic`: if model sets agree=true but player text hits hope/release/prosper patterns, pipeline **forces disagree** and logs correction. Gate prompt includes few-shot calibration lines.
+- Heuristic expanded: `will find you`, `fortune will`, `luck will`; bare `fortune` (not `misfortune`); combo **let go/release + blessing outcome**; handles typos like \"goof fortune will find you\".
+- Duel: optional **Demon Reading Output Fallback** → `DemonTarotReader` so demon text shows when duel-only `TMP_Text` unset; console `[Duel][Demon]` log. Judge prompt asks for 4–7 sentence rationale with concrete spread-tied comparison.
+- Judge prompt fix: model had called the demon **protective** (role inversion). Prompt now locks FORTUNE TELLER = help only, DEMON = harm only; forbids treating bleakness or \"warnings\" as automatic demon win; rationale sentences 1–2 must start with fixed prefixes.
 - Fixed spread-theme mapping for random pulls in `TarotPullSpreadBuilder`: theme now resolves by matching UI title to database card name instead of slot index.
 
 ### Rename + demon reader

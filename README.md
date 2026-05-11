@@ -18,14 +18,25 @@ This Unity game is a narrative strategy experience where the player is a 10th ge
 - Card data stored in ScriptableObject assets.
 - Scene currently supports a hardcoded 3-card draw for UI hookup testing.
 - Deck will expand beyond 3 cards as development continues.
-- **Stage 1 LLM:** `OllamaClient` + `TarotReadingSmokeTest` (positive prompt dev harness) and `DemonTarotReader` (negative demon prompt). Judge/ruling not wired yet.
+- **Stage 1 LLM:** `OllamaClient` + `TarotReadingSmokeTest` (positive prompt dev harness) and `DemonTarotReader` (negative demon prompt).
+- **Duel pipeline:** `TarotReadingDuelPipeline` — player text (`TMP_InputField`) → demon **gate** (JSON) → if not agreed, demon **reading** (shared `DemonTarotPrompts`) → **judge** (JSON). Optional hotkey **J** or UI button calling `RunDuel()`. `onGateAgreedWithPlayer(bool)` fires after gate; `onJudgeComplete(bool playerWon, string rationale)` only when a judge ran.
 
 ## Ollama (local LLM) — test setup
 1. Install [Ollama](https://ollama.com) and run `ollama serve` (default `http://127.0.0.1:11434`).
 2. Pull a model, e.g. `ollama pull llama3.2` (or set `OllamaClient`’s model name to match whatever you installed).
 3. Add `OllamaClient`. Optionally add `TarotReadingSmokeTest` and/or `DemonTarotReader` (same GameObject or separate).
-4. Assign **`TarotCardPull`** on both `TarotReadingSmokeTest` and `DemonTarotReader`. Link **Ollama** to `OllamaClient`; assign `TMP_Text` if desired. **`TarotPullSpreadBuilder`** reads slot data from `TarotCardPull` (`cardDescriptions`, `cardMorality`, `cardImages` length); theme strings come from **`tarotDatabase.cards[i]`** when indices match the pull. No edits required on `TarotCardPull` itself.
-5. Play Mode: **I** = positive smoke-test reading; **D** = demon reading (defaults). Or enable **Request On Start** on either component. Uncheck **Listen For Hotkey** if you only want UI/button triggers.
+4. Assign **`TarotCardPull`** on both `TarotReadingSmokeTest` and `DemonTarotReader`. Link **Ollama** to `OllamaClient`; assign `TMP_Text` if desired. **`TarotPullSpreadBuilder`** matches themes by **card title** to `tarotDatabase` entries (works with random pulls). No edits required on `TarotCardPull` itself.
+5. Play Mode: enable **Listen For Hotkey** on Smoke Test / Demon Reader if you want **I** / **D** (off by default so typing in `TMP_InputField` does not fire them). Hotkeys are ignored while a `TMP_InputField` is focused. Or use **Request On Start** on either component.
+6. **Duel:** Add `TarotReadingDuelPipeline`, assign `OllamaClient`, `TarotCardPull`, and a **TMP_InputField** for the player’s reading. Hook a UI **Button** to `RunDuel()` or enable **Listen For Hotkey** (**J**). Optional: `statusText`, `gateReasonText`, `demonReadingText`, `judgeResultText`. If **Demon Reading Text** is empty, assign **Demon Reading Output Fallback** to your **`DemonTarotReader`** component so duel demon prose goes to the same label as solo **D**. With **Log Gate And Judge To Console**, the full demon body also prints as `[Duel][Demon]`. UnityEvents: `onGateAgreedWithPlayer`, `onDemonReadingComplete`, `onJudgeComplete`.
+
+### Wiring `TarotReadingDuelPipeline` on **AIManager** (typical setup)
+1. Select **AIManager** → **Add Component** → **Tarot Reading Duel Pipeline**.
+2. **Ollama:** drag the same **Ollama Client** on this object (or the reference you already use).
+3. **Card Pull:** drag **GameManager**’s **Tarot Card Pull** (same reference as Smoke Test / Demon Reader).
+4. **Player Reading Input:** drag the **Player Input** object’s **TMP_InputField** component (the text field under *Player Input Background*).
+5. **Make Reading button:** in the **Button** component → **On Click ()** → add a slot → drag **AIManager** → choose **TarotReadingDuelPipeline → RunDuel** (no argument). Leave **Listen For Hotkey** off if you only use the button.
+6. **Console:** leave **Log Gate And Judge To Console** checked (default). You will see `[Duel][Gate] …` after every gate, an extra line when the demon **accepts** and skips the judge, and `[Duel][Judge] winner=…` after a full duel. Turn on **Log Status To Console** if you also want step spam (`Gate…`, `Demon…`, etc.).
+7. **Smoke Test / Demon Reader:** keep them for **I** / **D** quick tests; the duel pipeline does **not** replace them—it runs the full chain when you click **Make Reading**.
 
 ## Planned AI Architecture (Ollama)
 - Local LLM runtime via Ollama

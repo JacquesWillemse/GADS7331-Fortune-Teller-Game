@@ -29,6 +29,34 @@ public class OllamaClient : MonoBehaviour
         StartCoroutine(GenerateRoutine(prompt, onSuccess, onError));
     }
 
+    /// <summary>
+    /// Waits for a single generate call (for chaining steps in another component's coroutine).
+    /// </summary>
+    public IEnumerator GenerateWait(string prompt, Action<string> onSuccess, Action<string> onError)
+    {
+        bool done = false;
+        string ok = null;
+        string err = null;
+        Generate(
+            prompt,
+            s =>
+            {
+                ok = s;
+                done = true;
+            },
+            e =>
+            {
+                err = e;
+                done = true;
+            });
+        while (!done)
+            yield return null;
+        if (!string.IsNullOrEmpty(err))
+            onError?.Invoke(err);
+        else
+            onSuccess?.Invoke(ok);
+    }
+
     private IEnumerator GenerateRoutine(string prompt, Action<string> onSuccess, Action<string> onError)
     {
         var payload = new OllamaGenerateRequest

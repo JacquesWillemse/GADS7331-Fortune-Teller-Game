@@ -16,7 +16,7 @@ public class TarotReadingSmokeTest : MonoBehaviour
     [FormerlySerializedAs("interpretOnStart")]
     [SerializeField] private bool requestOnStart;
     [FormerlySerializedAs("listenForInterpretHotkey")]
-    [SerializeField] private bool listenForHotkey = true;
+    [SerializeField] private bool listenForHotkey;
     [FormerlySerializedAs("interpretTestKey")]
     [SerializeField] private Key smokeTestKey = Key.I;
     [SerializeField] private TMP_Text interpretationOutput;
@@ -34,6 +34,8 @@ public class TarotReadingSmokeTest : MonoBehaviour
     private void Update()
     {
         if (!listenForHotkey)
+            return;
+        if (GameplayHotkeyGuard.IsTypingInTmpInputField())
             return;
         if (Keyboard.current == null)
             return;
