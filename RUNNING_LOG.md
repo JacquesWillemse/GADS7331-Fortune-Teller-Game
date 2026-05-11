@@ -58,6 +58,19 @@
 ### Demon prompt iteration
 - Rewrote default demon prompt: carnival-bound predator voice, verdict-like lines, moral-lean handling (Good twist harder / Neutral cruel fate / Bad inevitable doom).
 - Added Inspector **Additional Demon Instructions** (`DemonTarotReader`) for tuning without code edits.
+- Demon prompt: forbid echoing card titles / distinctive phrases from private lines — require fresh metaphors only (stops lines like “20 succulent meals…” mirroring the card text).
+- Tightened structure to reduce generic poetic filler: exactly 3 lines (vice -> consequence -> final doom verdict), with explicit ban on soft abstractions and direct card-scene references.
+- Added spread-balance constraint: demon output must use at least two symbolic hooks from different cards, ideally split across sentence 1 and sentence 2, then fused in sentence 3.
+- Added semantic-anchor rule: each line must stay traceable to card meaning (anchor-level), while still banning lexical/title overlap (word-level).
+- Fixed prompt leakage from scaffolding tokens (`A`, `B`, `A+B`, `private symbol`) by removing those labels from instructions and explicitly forbidding meta/planning words in output.
+- Added anti-generic patch: each sentence must include a concrete sensory image, and final output now bans rubric words (`vice`, `consequence`, `anchor`, etc.) to avoid checklist-sounding prose.
+- Major demon prompt redesign: switched to theme-group sentence generation (shared-theme cards reinforce in one line; unique themes get one line each) plus one final overall negative prediction.
+- Demon prompt: mandatory short closing verdict line (12–22 words), must weave ≥2 thematic threads in plain language; never omit; never use DB theme tokens Greed/Vanity/Chaos/Power verbatim.
+- Reverted demon **body** to prior 3-sentence curse structure (two hooks + fuse, sensory, strict no-title-echo); kept **sentence 4** as mandatory closing verdict. Removed theme-per-sentence grouping that caused literal card props (cheese, remote, etc.).
+- Demon prompt simplified again to match early “3 lines + verdict” intent: **3 sentences** = one per private spread line (any order), classic booth tone; **sentence 4** = short decisive closing curse only. Stripped long fuse/hook/no-echo scaffolding that was steering the model wrong.
+- Demon prompt fix: model was restaging card jokes (remote, hair, kitchen). Body lines must curse from **Theme + Moral lean** only; strict ban on recognizable title props/scenes in sentences 1–3; sentence 4 remains overall doom hammer.
+- Demon prompt: **gender-neutral** output — no she/her/he/him or gendered nouns for the querent; card gender in titles must not be projected onto the listener (`they/them`, `one`, `you/your`, or impersonal phrasing).
+- Fixed spread-theme mapping for random pulls in `TarotPullSpreadBuilder`: theme now resolves by matching UI title to database card name instead of slot index.
 
 ### Rename + demon reader
 - Renamed `TarotCardInterpreter` → `TarotReadingSmokeTest` (same script GUID preserved for Unity references). Serialized fields migrated with `FormerlySerializedAs` where renamed.

@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// Reads card slot data from <see cref="TarotCardPull"/> only (no changes required on that script).
-/// Theme is taken from <c>tarotDatabase.cards[i]</c> when indices align with the pull order.
+/// Resolves theme by matching the slot title back to <c>tarotDatabase.cards</c> for random-pull safety.
 /// </summary>
 public static class TarotPullSpreadBuilder
 {
@@ -27,8 +27,19 @@ public static class TarotPullSpreadBuilder
                 return false;
 
             string theme = "";
-            if (pull.tarotDatabase != null && pull.tarotDatabase.cards != null && i < pull.tarotDatabase.cards.Count)
-                theme = pull.tarotDatabase.cards[i].cardTheme ?? "";
+            if (pull.tarotDatabase != null && pull.tarotDatabase.cards != null)
+            {
+                for (int j = 0; j < pull.tarotDatabase.cards.Count; j++)
+                {
+                    TarotCardData dbCard = pull.tarotDatabase.cards[j];
+                    if (dbCard == null || string.IsNullOrWhiteSpace(dbCard.cardName))
+                        continue;
+                    if (!string.Equals(dbCard.cardName.Trim(), title, System.StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    theme = dbCard.cardTheme ?? "";
+                    break;
+                }
+            }
 
             cards.Add(new TarotCardData
             {
