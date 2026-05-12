@@ -12,6 +12,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] Button cardsBtn;
     [SerializeField] Button wisdonBookBtn;
 
+    //Panels
+    [SerializeField] GameObject cardUI;
+
     //Active Card Check
     private bool cardsPulled = false;
 
@@ -57,5 +60,15 @@ public class UIManager : MonoBehaviour
     {
 
     }
+
+    public void HideCardPanel()
+    {
+        cardUI.SetActive(false);
+    }
+    public void ShowCardPanel()
+    {
+        cardUI.SetActive(true);
+    }
+
 
 }
