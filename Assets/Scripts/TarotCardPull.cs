@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -11,6 +12,8 @@ public class TarotCardPull : MonoBehaviour
     public TarotCards tarotDatabase;
 
     //CardData
+    public GameObject[] CardHolders;
+
     public TMP_Text[] cardDescriptions;
     public Image[] cardImages;
     public TarotMoral[] cardMorality;
@@ -26,7 +29,7 @@ public class TarotCardPull : MonoBehaviour
     void Start()
     {
         cardCount = tarotDatabase.cards.Count;
-        CardPull();
+        //CardPull();
     }
 
     // Update is called once before the first execution of Update after MonoBehaviour is created
@@ -34,17 +37,28 @@ public class TarotCardPull : MonoBehaviour
     {
         
     }
+    public void CardPull()
+    {
+        StartCoroutine(CardPullCoroutine());
+    }
 
-    private void CardPull()
+    private IEnumerator CardPullCoroutine()
     {
         TarotCardData card;
+
         for (int i = 0; i < cardDrawsAmount; i++)
         {
             card = tarotDatabase.cards[RandomCard()];
+
             cardDescriptions[i].text = card.cardName;
             cardImages[i] = card.tarotCardImage;
             cardMorality[i] = card.cardMoral;
+
+            CardHolders[i].SetActive(true);
+
             Debug.Log(card.cardTheme);
+
+            yield return new WaitForSeconds(0.5f);
         }
     }
 

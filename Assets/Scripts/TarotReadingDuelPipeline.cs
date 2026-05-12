@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
-/// Chains: player text → demon gate (JSON) → if not agreed, demon reading → judge (JSON).
+/// Chains: player text → demon gate (JSON) → if not agreed, demon reading → rule-based fortune duel score (no judge LLM).
 /// Wire <see cref="playerReadingInput"/>, <see cref="ollama"/>, <see cref="cardPull"/>, optional UI texts, then call <see cref="RunDuel"/> from a button or hotkey.
 /// </summary>
 public class TarotReadingDuelPipeline : MonoBehaviour
@@ -31,10 +31,10 @@ public class TarotReadingDuelPipeline : MonoBehaviour
     [SerializeField] private bool listenForHotkey;
     [SerializeField] private Key runDuelKey = Key.J;
 
-    [Header("Judge rubric")]
-    [Tooltip("Flat points added to the player's judge total (0-10). Wire from energy spend later if desired.")]
+    [Header("Fortune duel scoring")]
+    [Tooltip("Magic power: flat 0–10 added to the player’s total (same serialized field as before).")]
     [SerializeField, Range(0, 10)] private int playerEnergyBonusForJudge;
-    [Tooltip("When rubric totals tie after the energy bonus, the player wins if true.")]
+    [Tooltip("When totals tie, the player wins if true.")]
     [SerializeField] private bool tieRoundGoesToPlayer = true;
 
     [Header("Debug")]
@@ -189,65 +189,24 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             Debug.Log("[Duel][Demon]\n" + demonText);
         onDemonReadingComplete?.Invoke(demonText);
 
-        // --- Judge ---
-        SetStatus("Judge…");
-        string judgeRaw = null;
-        string judgeErr = null;
-        yield return StartCoroutine(ollama.GenerateWait(
-            TarotJudgePrompts.BuildJudgePrompt(_spread, playerReading, demonText, playerEnergyBonusForJudge),
-            s => judgeRaw = s,
-            e => judgeErr = e));
+        // --- Fortune duel score (deterministic rubric; no judge LLM) ---
+        SetStatus("Scoring duel…");
+        FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(
+            _spread,
+            playerReading,
+            demonText ?? "",
+            playerEnergyBonusForJudge);
 
-        if (!string.IsNullOrEmpty(judgeErr))
-        {
-            SetStatus("Judge error: " + judgeErr);
-            Debug.LogWarning("[Duel][Judge] error: " + judgeErr);
-            _busy = false;
-            yield break;
-        }
+        bool playerWon = duel.PlayerTotal > duel.DemonTotal
+            ? true
+            : duel.DemonTotal > duel.PlayerTotal
+                ? false
+                : tieRoundGoesToPlayer;
 
-        bool playerWon = false;
-        string rationale = judgeRaw;
-        string scoreSummary = null;
-        if (TarotLlmJsonHelpers.TryParseJudge(judgeRaw, out JudgeJson judgeJson))
-        {
-            if (string.IsNullOrEmpty(judgeJson.rationale))
-            {
-                rationale = "(No rationale extracted.)";
-                if (logGateAndJudgeToConsole)
-                    Debug.Log("[Duel][Judge] raw response (no rationale field parsed):\n" + judgeRaw);
-            }
-            else
-                rationale = judgeJson.rationale;
-
-            if (judgeJson.player_scores != null && judgeJson.demon_scores != null)
-            {
-                judgeJson.player_scores.energy_bonus = Mathf.Clamp(playerEnergyBonusForJudge, 0, TarotJudgeRubric.MaxEnergyBonus);
-                judgeJson.demon_scores.energy_bonus = 0;
-                int pTotal = TarotLlmJsonHelpers.SumJudgeSide(judgeJson.player_scores, TarotJudgeRubric.MaxEnergyBonus);
-                int dTotal = TarotLlmJsonHelpers.SumJudgeSide(judgeJson.demon_scores, 0);
-                judgeJson.player_scores.total = pTotal;
-                judgeJson.demon_scores.total = dTotal;
-                if (pTotal > dTotal)
-                    playerWon = true;
-                else if (dTotal > pTotal)
-                    playerWon = false;
-                else
-                    playerWon = tieRoundGoesToPlayer;
-                scoreSummary =
-                    $"Player total={pTotal} (theme {judgeJson.player_scores.theme_alignment}, moral {judgeJson.player_scores.morality_role_fit}, persuade {judgeJson.player_scores.persuasiveness}, role {judgeJson.player_scores.role_fidelity}, energy {judgeJson.player_scores.energy_bonus}) | " +
-                    $"Demon total={dTotal} (theme {judgeJson.demon_scores.theme_alignment}, moral {judgeJson.demon_scores.morality_role_fit}, persuade {judgeJson.demon_scores.persuasiveness}, role {judgeJson.demon_scores.role_fidelity})";
-            }
-            else if (!string.IsNullOrEmpty(judgeJson.winner))
-                playerWon = TarotLlmJsonHelpers.IsPlayerWinner(judgeJson.winner);
-            else
-                playerWon = judgeRaw.ToLowerInvariant().Contains("player");
-        }
-        else
-        {
-            playerWon = judgeRaw.ToLowerInvariant().Contains("player");
-            rationale = "(Could not parse judge JSON.) " + judgeRaw;
-        }
+        string rationale = FortuneDuelRubric.FormatRationale(duel, playerWon);
+        string scoreSummary =
+            $"Player total={duel.PlayerTotal} (magic {duel.PlayerMagicPower}, moral {duel.PlayerMoralFromCards}, theme {duel.PlayerThemeIdentification}, align {duel.PlayerAlignment}) | " +
+            $"Demon total={duel.DemonTotal} (moral {duel.DemonMoralFromCards}, theme {duel.DemonThemeIdentification}, align {duel.DemonAlignment})";
 
         if (judgeResultText != null)
         {

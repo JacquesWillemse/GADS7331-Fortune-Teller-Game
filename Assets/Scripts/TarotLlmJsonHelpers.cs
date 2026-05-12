@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 [Serializable]
@@ -56,6 +57,19 @@ public static class TarotLlmJsonHelpers
             json = t.Substring(a, end - a + 1);
             return true;
         }
+
+        // Judge payloads often omit the final root "}". LastIndexOf('}') then closes at demon_scores and drops rationale.
+        string tail = t.Substring(a);
+        if (LooksLikeJudgeJsonFragment(tail))
+        {
+            string sealedTail = SealTrailingRootBrace(tail);
+            if (TryGetBalancedJsonEndInclusive(sealedTail, 0, out int endSealed))
+            {
+                json = sealedTail.Substring(0, endSealed + 1);
+                return true;
+            }
+        }
+
         // Truncated or malformed braces: last resort (may slice wrong if a "}" appears inside a string).
         int b = t.LastIndexOf('}');
         if (b > a)
@@ -64,6 +78,26 @@ public static class TarotLlmJsonHelpers
             return true;
         }
         return false;
+    }
+
+    static bool LooksLikeJudgeJsonFragment(string tail)
+    {
+        if (string.IsNullOrEmpty(tail) || tail[0] != '{')
+            return false;
+        return tail.IndexOf("\"winner\"", StringComparison.OrdinalIgnoreCase) >= 0
+            && tail.IndexOf("\"player_scores\"", StringComparison.OrdinalIgnoreCase) >= 0
+            && tail.IndexOf("\"demon_scores\"", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    /// <summary>Appends a single closing brace when the model stopped after "confidence": 0.9 with no root close.</summary>
+    static string SealTrailingRootBrace(string tail)
+    {
+        string s = tail.TrimEnd();
+        if (s.Length == 0)
+            return tail;
+        if (s[s.Length - 1] == '}')
+            return s;
+        return s + "\n}";
     }
 
     /// <summary>Index <paramref name="openBraceIndex"/> must point at <c>{</c>.</summary>
@@ -126,8 +160,12 @@ public static class TarotLlmJsonHelpers
     public static bool TryParseJudge(string raw, out JudgeJson judge)
     {
         judge = null;
-        if (!TryExtractJsonObject(raw, out string json))
+        string trimmedRaw = (raw ?? "").Trim();
+        if (trimmedRaw.Length == 0)
             return false;
+
+        if (!TryExtractJsonObject(trimmedRaw, out string json))
+            return TryParseJudgeFromScoreListing(trimmedRaw, out judge);
 
         JudgeJson parsed = null;
         try
@@ -165,6 +203,8 @@ public static class TarotLlmJsonHelpers
 
         if (string.IsNullOrEmpty(parsed.rationale))
             parsed.rationale = TryParseJudgeRationaleString(json);
+        if (string.IsNullOrEmpty(parsed.rationale))
+            parsed.rationale = TryParseJudgeRationaleString(trimmedRaw);
 
         bool hasWinner = !string.IsNullOrEmpty(parsed.winner);
         bool hasScores = parsed.player_scores != null && parsed.demon_scores != null;
@@ -173,6 +213,137 @@ public static class TarotLlmJsonHelpers
 
         judge = parsed;
         return true;
+    }
+
+    /// <summary>
+    /// Models sometimes reply with prose + markdown lists ("Player:" / "Demon:") instead of JSON.
+    /// Recovers subscores when each block lists theme_alignment, morality_role_fit, persuasiveness, role_fidelity.
+    /// </summary>
+    static bool TryParseJudgeFromScoreListing(string raw, out JudgeJson judge)
+    {
+        judge = null;
+        if (string.IsNullOrEmpty(raw))
+            return false;
+
+        const RegexOptions lineOpts = RegexOptions.IgnoreCase | RegexOptions.Multiline;
+        MatchCollection demonMatches = Regex.Matches(raw, @"^\s*Demon\s*:", lineOpts);
+        MatchCollection playerMatches = Regex.Matches(raw, @"^\s*Player\s*:", lineOpts);
+        if (demonMatches.Count == 0 || playerMatches.Count == 0)
+            return false;
+
+        int demonHeaderIdx = demonMatches[0].Index;
+        int playerHeaderIdx = -1;
+        for (int i = playerMatches.Count - 1; i >= 0; i--)
+        {
+            if (playerMatches[i].Index < demonHeaderIdx)
+            {
+                playerHeaderIdx = playerMatches[i].Index;
+                break;
+            }
+        }
+
+        string playerBody;
+        string demonBody;
+        int rationaleCut;
+
+        if (playerHeaderIdx >= 0)
+        {
+            rationaleCut = Math.Min(playerHeaderIdx, demonHeaderIdx);
+            int pContent = IndexAfterLineStart(raw, playerHeaderIdx);
+            demonBody = raw.Substring(IndexAfterLineStart(raw, demonHeaderIdx)).TrimEnd();
+            playerBody = raw.Substring(pContent, demonHeaderIdx - pContent);
+        }
+        else
+        {
+            int playerAfterDemon = -1;
+            for (int i = 0; i < playerMatches.Count; i++)
+            {
+                if (playerMatches[i].Index > demonHeaderIdx)
+                {
+                    playerAfterDemon = playerMatches[i].Index;
+                    break;
+                }
+            }
+
+            if (playerAfterDemon < 0)
+                return false;
+
+            rationaleCut = demonHeaderIdx;
+            int dContent = IndexAfterLineStart(raw, demonHeaderIdx);
+            demonBody = raw.Substring(dContent, playerAfterDemon - dContent);
+            playerBody = raw.Substring(IndexAfterLineStart(raw, playerAfterDemon)).TrimEnd();
+        }
+
+        if (!TryParseJudgeSideFromListingBody(playerBody, out JudgeSideScoresDto ps))
+            return false;
+        if (!TryParseJudgeSideFromListingBody(demonBody, out JudgeSideScoresDto ds))
+            return false;
+
+        ps.energy_bonus = 0;
+        ps.total = 0;
+        ds.energy_bonus = 0;
+        ds.total = 0;
+
+        string rationale = BuildLooseJudgeListingRationale(raw, rationaleCut);
+        judge = new JudgeJson
+        {
+            winner = "",
+            player_scores = ps,
+            demon_scores = ds,
+            rationale = rationale,
+            confidence = 0f,
+        };
+        return true;
+    }
+
+    static int IndexAfterLineStart(string raw, int lineStartIndex)
+    {
+        int n = raw.IndexOf('\n', lineStartIndex);
+        return n < 0 ? raw.Length : n + 1;
+    }
+
+    static string BuildLooseJudgeListingRationale(string raw, int cutIndex)
+    {
+        if (cutIndex <= 0)
+            return "(Scores recovered from judge listing; model did not return valid JSON.)";
+        string t = raw.Substring(0, cutIndex).Trim();
+        const int maxLen = 1800;
+        if (t.Length > maxLen)
+            t = t.Substring(0, maxLen).TrimEnd() + "…";
+        return t.Length > 0
+            ? t
+            : "(Scores recovered from judge listing; model did not return valid JSON.)";
+    }
+
+    static bool TryParseJudgeSideFromListingBody(string body, out JudgeSideScoresDto dto)
+    {
+        dto = null;
+        if (string.IsNullOrWhiteSpace(body))
+            return false;
+        var d = new JudgeSideScoresDto();
+        if (!TryReadListingInt(body, "theme_alignment", out d.theme_alignment))
+            return false;
+        if (!TryReadListingInt(body, "morality_role_fit", out d.morality_role_fit))
+            return false;
+        if (!TryReadListingInt(body, "persuasiveness", out d.persuasiveness))
+            return false;
+        if (!TryReadListingInt(body, "role_fidelity", out d.role_fidelity))
+            return false;
+        dto = d;
+        return true;
+    }
+
+    static bool TryReadListingInt(string body, string field, out int value)
+    {
+        value = 0;
+        string esc = Regex.Escape(field);
+        Match m = Regex.Match(
+            body,
+            $@"(?im)(?:^|\n)\s*[-*]?\s*{esc}\s*:\s*(-?\d+)",
+            RegexOptions.None);
+        if (!m.Success)
+            return false;
+        return int.TryParse(m.Groups[1].Value, out value);
     }
 
     static bool TryParseJudgeScoreObjects(string json, out JudgeSideScoresDto player, out JudgeSideScoresDto demon)
@@ -317,11 +488,8 @@ public static class TarotLlmJsonHelpers
             }
             if (c == '\\' && i + 1 < json.Length && json[i + 1] == '"')
             {
-                int j = i + 2;
-                while (j < json.Length && char.IsWhiteSpace(json[j]))
-                    j++;
-                if (j < json.Length && (json[j] == ',' || json[j] == '}'))
-                    break;
+                // Always treat \" as a literal quote inside the rationale. A former early-exit here
+                // truncated strings when \" was followed by whitespace and then "," (common in model output).
                 sb.Append('"');
                 i += 2;
                 continue;
