@@ -7,7 +7,7 @@ using TMPro;
 /// <summary>
 /// Tent flow: draw 3 cards → read fortune (player text UI, no score) → open Cards view to summon spirit prediction →
 /// open Judge view and press <see cref="RenderVerdict"/> when ready. Magical energy 0–100 on the slider; at 100 the player always wins.
-/// Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
+/// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy). Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
 /// </summary>
 public class FortuneFlowController : MonoBehaviour
 {
@@ -24,6 +24,12 @@ public class FortuneFlowController : MonoBehaviour
     [SerializeField] private TMP_InputField playerFortuneInput;
     [SerializeField] private Slider magicalEnergySlider;
 
+    [Header("Player reading coach")]
+    [Tooltip("If set, assigned to the TMP_InputField placeholder so players know to close with themes + moral lean twisted toward hope.")]
+    [SerializeField, TextArea(3, 10)]
+    private string playerFortuneClosingPlaceholderHint =
+        "Close with one sentence tying the three card moods together and whether they lean kind, severe, or cruel toward the listener — resolve into hope or mercy (do not paste card titles).";
+
     [Tooltip("All user-visible strings for this flow. Leave formats empty to skip that write.")]
     [SerializeField] private FortuneFlowOutputStrings outputStrings = new FortuneFlowOutputStrings();
 
@@ -38,6 +44,11 @@ public class FortuneFlowController : MonoBehaviour
     bool _cardsDrawn;
 
     public bool CardsDrawn => _cardsDrawn;
+
+    void Start()
+    {
+        ApplyPlayerFortunePlaceholderHint();
+    }
 
     void Awake()
     {
@@ -286,6 +297,14 @@ public class FortuneFlowController : MonoBehaviour
     {
         if (!string.IsNullOrEmpty(message))
             Debug.Log("[FortuneFlow] " + message);
+    }
+
+    void ApplyPlayerFortunePlaceholderHint()
+    {
+        if (playerFortuneInput == null || string.IsNullOrWhiteSpace(playerFortuneClosingPlaceholderHint))
+            return;
+        if (playerFortuneInput.placeholder is TextMeshProUGUI tmp)
+            tmp.text = playerFortuneClosingPlaceholderHint.Trim();
     }
 
     static void WriteTmp(TMP_Text label, string text, string context)

@@ -1,5 +1,5 @@
 # Fortune Teller Game Requirements Baseline
-# Date: 2026-05-09
+# Last updated: 2026-05-11 (two-pass demon; sync with README / PLAN / RUNNING_LOG)
 
 [Game Design Requirements]
 - Theme: carnival fortune telling with supernatural demon interference
@@ -13,6 +13,7 @@
   - Player gives positive interpretation
   - Demon AI gives negative interpretation
   - If player response is negative, demon agrees and judge phase is skipped
+  - Demon delivery (prototype): optional two-pass generation — (1) structured JSON outline validated in-game, (2) spoken curse bound to that outline; if outline is missing or invalid, fall back to single-pass demon prompt (no hard failure)
 - Judge system:
   - Judge AI receives cards + player response + demon response + customer context
   - Judge returns winner and rationale
@@ -36,13 +37,17 @@
 - AI Runtime: Ollama (local LLM inference)
 - AI Roles: Demon Interpreter, Judge Arbiter (and optional player-side assistant)
 - Networking: HTTP integration from Unity to Ollama API
+- Demon two-pass (when enabled in Inspector on `DemonTarotReader` / `TarotReadingDuelPipeline`):
+  - Pass 1: model returns JSON only; parser extracts object between first `{` and last `}`; themes constrained to greed | vanity | chaos | power (case-insensitive)
+  - Pass 2: model receives canonical serialized outline + spread context; output is the player-facing curse text
+  - Extra latency: two sequential generate calls when two-pass is on
 - Reliability:
   - request timeout
   - retry policy
   - safe fallback output
 - UX:
   - loading indicator while waiting for LLM response
-  - deterministic parse format for model output
+  - deterministic parse format for model output (gate/judge JSON; demon outline JSON when two-pass is used)
 
 [Quality Requirements]
 - Clear role-constrained prompts to minimize AI drift

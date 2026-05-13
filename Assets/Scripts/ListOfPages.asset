@@ -14,5 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BookPages
   pages:
   - pageHeading: 
-    pageWriting: 
+    pageWriting: "\u2022\tYou have to identify one of the 4 themes for each card
+      and make a connection between all 3, if 2 themes are repeated you must make
+      a reinforcing connection. \u2022\tYou must state whether it is a morally good,
+      bad or neutral reading \u2022\tIf its good the player has a judge bias, if
+      its bad the spirit does \u2022\tThe player can add a value of 0 to 100 energy
+      to their prediction that will influence the verdict, 100 is an automatic win.
+      \u2022\tThe fortune reading of the spirit and the player must end in a statement
+      referencing the themes and morality, but be twisted in a positive or negative
+      direction respectively "
     pageImage: {fileID: 0}

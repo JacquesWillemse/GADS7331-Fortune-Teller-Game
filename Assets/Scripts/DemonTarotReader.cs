@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -31,6 +32,10 @@ public class DemonTarotReader : MonoBehaviour
     [Header("Events")]
     [Tooltip("Fires whenever the spirit/demon reply text is set (including loading and error lines).")]
     public UnityEvent<string> onResponseText;
+
+    [Header("Two-pass reading")]
+    [Tooltip("Pass 1: compact JSON outline. Pass 2: spoken curse bound to that outline. Falls back to one pass if outline JSON cannot be parsed.")]
+    [SerializeField] private bool useTwoPassReading = true;
 
     [Header("Prompt tuning (optional)")]
     [Tooltip("Appended to the demon prompt so you can iterate in the Inspector without code changes.")]
@@ -117,26 +122,43 @@ public class DemonTarotReader : MonoBehaviour
         if (ollama == null || cards == null || cards.Count == 0)
             return;
 
-        string prompt = DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions);
         _requestInFlight = true;
         if (!skipInitialOutput && !string.IsNullOrEmpty(initialLoadingMessage))
             SetOutput(initialLoadingMessage);
 
-        ollama.Generate(
-            prompt,
-            text =>
+        StartCoroutine(CoRequestDemonReading(cards));
+    }
+
+    IEnumerator CoRequestDemonReading(IReadOnlyList<TarotCardData> cards)
+    {
+        try
+        {
+            string ok = null;
+            string err = null;
+            yield return StartCoroutine(DemonTarotTwoPass.CoGenerate(
+                ollama,
+                cards,
+                useTwoPassReading,
+                additionalDemonInstructions,
+                s => ok = s,
+                e => err = e,
+                null));
+
+            if (!string.IsNullOrEmpty(err))
             {
-                _requestInFlight = false;
-                SetOutput(text);
-                if (logToConsole)
-                    Debug.Log("[Demon LLM]\n" + text);
-            },
-            err =>
-            {
-                _requestInFlight = false;
                 SetOutput(FormatError(err));
                 Debug.LogWarning("[Demon LLM] " + err);
-            });
+                yield break;
+            }
+
+            SetOutput(ok ?? "");
+            if (logToConsole)
+                Debug.Log("[Demon LLM]\n" + ok);
+        }
+        finally
+        {
+            _requestInFlight = false;
+        }
     }
 
     string FormatError(string err)

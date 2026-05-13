@@ -41,6 +41,9 @@ public static class TarotPullSpreadBuilder
                 }
             }
 
+            if (string.IsNullOrWhiteSpace(theme))
+                theme = InferCarnivalThemeFromTitle(title);
+
             cards.Add(new TarotCardData
             {
                 cardName = title,
@@ -51,5 +54,42 @@ public static class TarotPullSpreadBuilder
         }
 
         return cards.Count > 0;
+    }
+
+    /// <summary>
+    /// When the database has no row matching the pulled title, infer a carnival theme so LLM prompts and
+    /// scoring see stable lane names instead of empty tags (which caused models to invent wrong lanes).
+    /// </summary>
+    static string InferCarnivalThemeFromTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return "";
+        string t = title.ToLowerInvariant();
+
+        if (t.Contains("greed"))
+            return "Greed";
+        if (t.Contains("vanity"))
+            return "Vanity";
+        if (t.Contains("chaos"))
+            return "Chaos";
+        if (t.Contains("power"))
+            return "Power";
+
+        if (t.Contains("mirror") || t.Contains("mohawk") || t.Contains("waxing") || t.Contains("haircut") || (t.Contains("ego") && t.Contains("pride")))
+            return "Vanity";
+
+        if (t.Contains("wrestling") || (t.Contains("mayhem") && t.Contains("crowd")))
+            return "Chaos";
+
+        if (t.Contains("shoot") || t.Contains("shot") || t.Contains("throne") || t.Contains("crown") || t.Contains("remote") ||
+            t.Contains("dominion") || (t.Contains("command") && t.Contains("weight")))
+            return "Power";
+
+        if (t.Contains("meal") || t.Contains("meals") || t.Contains("cheese") || t.Contains("succulent") || t.Contains("fry") ||
+            t.Contains("feast") || t.Contains("banquet") || t.Contains("glutton") || t.Contains("chinese") ||
+            (t.Contains("rat") && (t.Contains("cheese") || t.Contains("fry"))))
+            return "Greed";
+
+        return "";
     }
 }

@@ -12,8 +12,9 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
 - Unity scene has a working test hookup for drawing and showing 3 cards.
 - Tarot card ScriptableObject data exists and includes hidden themes.
 - Card count is intentionally hardcoded to 3 for UI testing.
-- No Ollama integration yet.
-- No judge pipeline yet.
+- **Ollama:** `OllamaClient` (`/api/generate`), `TarotReadingSmokeTest` (positive harness), `DemonTarotReader` (demon harness), shared prompts in `DemonTarotPrompts` / `TarotJudgePrompts`.
+- **Duel prototype:** `TarotReadingDuelPipeline` — optional demon gate (JSON) → demon reading → judge path and/or deterministic duel scoring (see scripts; judge LLM wiring as configured in scene).
+- **Demon reading quality:** optional **two-pass** flow (`DemonTarotTwoPass`, `DemonReadingOutline` + parser): JSON outline then prose curse; Inspector toggles on `DemonTarotReader` and `TarotReadingDuelPipeline`; parse failure falls back to single-pass demon prompt.
 
 ## Gameplay Loop (Target)
 1. Customer enters tent
@@ -51,9 +52,10 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
 ### Milestone 2 - LLM Integration (Ollama)
 - Build `OllamaClient` service in Unity (initial version done: `/api/generate`).
 - `TarotReadingSmokeTest` for positive prompt harness; `DemonTarotReader` for inverted demon prompt (same card slice).
+- Demon prompts centralized in `DemonTarotPrompts` (single-pass, gate, outline pass, second-pass prose); optional `DemonTarotTwoPass` orchestration with JSON outline parse + fallback.
 - Build prompt templates:
   - `PlayerReaderPrompt`
-  - `DemonReaderPrompt`
+  - `DemonReaderPrompt` (largely superseded by `DemonTarotPrompts` in prototype)
   - `JudgePrompt`
 - Add timeout, retry, and fallback response handling.
 
@@ -94,9 +96,10 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
    - one customer
    - card draw
    - player input
-   - demon response
+   - demon response (single- or two-pass, as toggled)
    - judge result
    - resource update
+4. Tune two-pass outline reliability (prompt strictness vs parser relaxation) if playtests show frequent fallback.
 
 ## Risks and Mitigations
 - Risk: LLM responses vary too much.

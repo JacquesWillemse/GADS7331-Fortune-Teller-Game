@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
-/// Chains: player text → demon gate (JSON) → if not agreed, demon reading → rule-based fortune duel score (no judge LLM).
+/// Chains: optional demon gate (JSON) → demon reading → rule-based fortune duel score (no judge LLM).
+/// Demon gate can be turned off in the Inspector; demon reading UI can show summoning / acceptance copy.
 /// Wire <see cref="playerReadingInput"/>, <see cref="ollama"/>, <see cref="cardPull"/>, optional UI texts, then call <see cref="RunDuel"/> from a button or hotkey.
 /// </summary>
 public class TarotReadingDuelPipeline : MonoBehaviour
@@ -23,8 +24,20 @@ public class TarotReadingDuelPipeline : MonoBehaviour
     [SerializeField] private DemonTarotReader demonReadingOutputFallback;
     [SerializeField] private TMP_Text judgeResultText;
 
+    [Header("Demon gate")]
+    [Tooltip("When off, the pipeline skips the gate LLM call and always runs the demon counter-reading + scoring.")]
+    [SerializeField] private bool enableDemonGate;
+
     [Header("Demon reading (same extras as DemonTarotReader)")]
     [SerializeField, TextArea(2, 8)] private string additionalDemonInstructions = "";
+    [Tooltip("Pass 1: JSON outline; pass 2: prose curse. Falls back to single pass if outline JSON cannot be parsed.")]
+    [SerializeField] private bool useTwoPassDemonReading = true;
+
+    [Header("Demon reading UI copy")]
+    [Tooltip("Shown on Demon Reading Text (and fallback output) while the gate or demon reading is in progress. Leave empty to leave the label blank until text arrives.")]
+    [SerializeField, TextArea(1, 4)] private string demonReadingSummoningMessage = "Summoning spirit…";
+    [Tooltip("Shown on Demon Reading Text when the gate says the demon agrees with the player (no counter-reading). Leave empty to clear the label.")]
+    [SerializeField, TextArea(1, 4)] private string demonReadingAcceptsFortuneMessage = "I accept the fortune.";
 
     [Header("Input")]
     [SerializeField] private bool listenForHotkey;
@@ -104,51 +117,73 @@ public class TarotReadingDuelPipeline : MonoBehaviour
     {
         _busy = true;
         ClearOutputs();
-
-        // --- Gate ---
-        SetStatus("Demon gate…");
-        string gateRaw = null;
-        string gateErr = null;
-        yield return StartCoroutine(ollama.GenerateWait(
-            DemonTarotPrompts.BuildGatePrompt(_spread, playerReading),
-            s => gateRaw = s,
-            e => gateErr = e));
-
-        if (!string.IsNullOrEmpty(gateErr))
-        {
-            SetStatus("Gate error: " + gateErr);
-            Debug.LogWarning("[Duel][Gate] error: " + gateErr);
-            _busy = false;
-            yield break;
-        }
+        ApplyDemonReadingSummoningIfConfigured();
 
         bool agreed = false;
         string gateReason = "";
-        if (TarotLlmJsonHelpers.TryParseDemonGate(gateRaw, out DemonGateJson gateJson))
+        bool modelSaidAgree = false;
+
+        if (enableDemonGate)
         {
-            agreed = gateJson.demon_agrees_with_player;
-            gateReason = gateJson.reason ?? "";
+            // --- Gate ---
+            SetStatus("Demon gate…");
+            string gateRaw = null;
+            string gateErr = null;
+            yield return StartCoroutine(ollama.GenerateWait(
+                DemonTarotPrompts.BuildGatePrompt(_spread, playerReading),
+                s => gateRaw = s,
+                e => gateErr = e));
+
+            if (!string.IsNullOrEmpty(gateErr))
+            {
+                SetStatus("Gate error: " + gateErr);
+                Debug.LogWarning("[Duel][Gate] error: " + gateErr);
+                ApplyDemonReadingToUi("");
+                _busy = false;
+                yield break;
+            }
+
+            if (TarotLlmJsonHelpers.TryParseDemonGate(gateRaw, out DemonGateJson gateJson))
+            {
+                agreed = gateJson.demon_agrees_with_player;
+                gateReason = gateJson.reason ?? "";
+            }
+            else
+            {
+                agreed = InferAgreeFromRaw(gateRaw);
+                gateReason = "(Could not parse gate JSON; guessed from text.)";
+            }
+
+            modelSaidAgree = agreed;
+            if (agreed && DemonGatePositiveHeuristic.ModelGateReasonAdmitsNetPositive(gateReason))
+            {
+                agreed = false;
+                gateReason = "(Corrected: the model's reason describes a hopeful outcome — demon will counter.) " + gateReason;
+                if (logGateAndJudgeToConsole)
+                    Debug.Log("[Duel][Gate] Model agreed, but gate reason admits net-positive framing — forced demon_agrees_with_player=false.");
+            }
+
+            if (agreed && DemonGatePositiveHeuristic.ShouldForceDemonDisagree(playerReading))
+            {
+                agreed = false;
+                gateReason = "(Corrected: reading is net hopeful / releasing — demon will counter.) " + gateReason;
+                if (logGateAndJudgeToConsole)
+                    Debug.Log("[Duel][Gate] Model agreed, but hope/release heuristic forced demon_agrees_with_player=false.");
+            }
         }
         else
         {
-            agreed = InferAgreeFromRaw(gateRaw);
-            gateReason = "(Could not parse gate JSON; guessed from text.)";
-        }
-
-        bool modelSaidAgree = agreed;
-        if (agreed && DemonGatePositiveHeuristic.ShouldForceDemonDisagree(playerReading))
-        {
             agreed = false;
-            gateReason = "(Corrected: reading is net hopeful / releasing — demon will counter.) " + gateReason;
+            gateReason = "Demon gate disabled — counter-reading proceeds.";
             if (logGateAndJudgeToConsole)
-                Debug.Log("[Duel][Gate] Model agreed, but hope/release heuristic forced demon_agrees_with_player=false.");
+                Debug.Log("[Duel][Gate] skipped (enableDemonGate is false).");
         }
 
         if (gateReasonText != null)
             gateReasonText.text = gateReason;
         onGateAgreedWithPlayer?.Invoke(agreed);
 
-        if (logGateAndJudgeToConsole)
+        if (logGateAndJudgeToConsole && enableDemonGate)
         {
             Debug.Log($"[Duel][Gate] demon_agrees_with_player={agreed} (model={modelSaidAgree}) | reason: {gateReason}");
             if (agreed)
@@ -158,8 +193,7 @@ public class TarotReadingDuelPipeline : MonoBehaviour
         if (agreed)
         {
             SetStatus("Demon agrees with the player — no counter-reading, no judge.");
-            if (demonReadingText != null)
-                demonReadingText.text = "";
+            ApplyDemonReadingToUi(demonReadingAcceptsFortuneMessage ?? "");
             if (judgeResultText != null)
                 judgeResultText.text = "";
             _busy = false;
@@ -167,18 +201,24 @@ public class TarotReadingDuelPipeline : MonoBehaviour
         }
 
         // --- Demon counter-reading ---
+        ApplyDemonReadingSummoningIfConfigured();
         SetStatus("Demon counter-reading…");
         string demonText = null;
         string demonErr = null;
-        yield return StartCoroutine(ollama.GenerateWait(
-            DemonTarotPrompts.BuildReadingPrompt(_spread, additionalDemonInstructions),
+        yield return StartCoroutine(DemonTarotTwoPass.CoGenerate(
+            ollama,
+            _spread,
+            useTwoPassDemonReading,
+            additionalDemonInstructions,
             s => demonText = s,
-            e => demonErr = e));
+            e => demonErr = e,
+            playerReading));
 
         if (!string.IsNullOrEmpty(demonErr))
         {
             SetStatus("Demon error: " + demonErr);
             Debug.LogWarning("[Duel][Demon] error: " + demonErr);
+            ApplyDemonReadingToUi("");
             _busy = false;
             yield break;
         }
@@ -233,6 +273,13 @@ public class TarotReadingDuelPipeline : MonoBehaviour
         if (t.Contains("\"demon_agrees_with_player\":false"))
             return false;
         return false;
+    }
+
+    private void ApplyDemonReadingSummoningIfConfigured()
+    {
+        if (string.IsNullOrEmpty(demonReadingSummoningMessage))
+            return;
+        ApplyDemonReadingToUi(demonReadingSummoningMessage);
     }
 
     private void ApplyDemonReadingToUi(string demonText)

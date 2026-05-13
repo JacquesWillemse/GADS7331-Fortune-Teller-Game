@@ -19,7 +19,8 @@ This Unity game is a narrative strategy experience where the player is a 10th ge
 - Scene currently supports a hardcoded 3-card draw for UI hookup testing.
 - Deck will expand beyond 3 cards as development continues.
 - **Stage 1 LLM:** `OllamaClient` + `TarotReadingSmokeTest` (positive prompt dev harness) and `DemonTarotReader` (negative demon prompt).
-- **Duel pipeline:** `TarotReadingDuelPipeline` — player text (`TMP_InputField`) → demon **gate** (JSON) → if not agreed, demon **reading** (shared `DemonTarotPrompts`) → **judge** (JSON). Optional hotkey **J** or UI button calling `RunDuel()`. `onGateAgreedWithPlayer(bool)` fires after gate; `onJudgeComplete(bool playerWon, string rationale)` only when a judge ran.
+- **Demon reading (optional two-pass):** `DemonTarotTwoPass` coordinates pass 1 (JSON outline via `DemonTarotPrompts.BuildReadingOutlinePrompt`) and pass 2 (prose via `BuildReadingSecondPassProsePrompt`). Parsed with `DemonReadingOutlineParser`; invalid outline → automatic **single-pass** fallback (`BuildReadingPrompt`). Toggle on **`DemonTarotReader`** (**Use Two Pass Reading**) and on **`TarotReadingDuelPipeline`** (**Use Two Pass Demon Reading**). Console: `[DemonTwoPass] Outline OK…` vs outline parse fallback warning.
+- **Duel pipeline:** `TarotReadingDuelPipeline` — player text (`TMP_InputField`) → optional demon **gate** (JSON) → if not agreed, demon **reading** (shared `DemonTarotPrompts`, optionally two-pass above) → **verdict** via deterministic **`FortuneDuelRubric`** (no judge LLM in this script; `onJudgeComplete` fires with winner + one-line explanation after scoring; omitted when the demon **agrees at the gate** and the run ends early). Console `[Duel][Judge]` matches that step. Optional hotkey **J** or UI button calling `RunDuel()`. `onGateAgreedWithPlayer(bool)` fires after gate; `onDemonReadingComplete` after demon text when a counter-reading ran.
 
 ## Ollama (local LLM) — test setup
 1. Install [Ollama](https://ollama.com) and run `ollama serve` (default `http://127.0.0.1:11434`).
@@ -58,9 +59,10 @@ This Unity game is a narrative strategy experience where the player is a 10th ge
 9. Next customer
 
 ## Repository Documentation
-- `PLAN.md` - development roadmap and milestones
-- `RUNNING_LOG.md` - chronological implementation notes
-- `requirements.txt` - feature and system requirements snapshot
+- `PLAN.md` — development roadmap and milestones (keep **Current State** in sync with the repo).
+- `RUNNING_LOG.md` — chronological implementation notes (append a dated section per meaningful session).
+- `requirements.txt` — feature and technical requirements snapshot (update when behavior or constraints change).
+- `PLAYER_DUEL_SCORING_GUIDE.md` — **player-facing**: how the fortune duel is scored (themes, morals, word lists, prediction checklist); matches `FortuneDuelRubric`.
 
 ## Getting Started (Unity)
 1. Open project in Unity Hub.

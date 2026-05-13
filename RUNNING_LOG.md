@@ -87,3 +87,19 @@
 - Renamed `TarotCardInterpreter` → `TarotReadingSmokeTest` (same script GUID preserved for Unity references). Serialized fields migrated with `FormerlySerializedAs` where renamed.
 - Added `DemonTarotReader` (default hotkey **D**): same spread slice and structural rules, inverted to net harmful/doom-laden output.
 - Shared spread lines in `TarotLlmSpreadContext` for prompt consistency.
+
+---
+
+## 2026-05-11
+
+### Two-pass demon / spirit reading (outline → prose)
+- **Goal:** Stabilize themes, anchors, and character across the five-sentence curse without pasting booth-style lane labels — pass 1 returns compact JSON; pass 2 writes spoken prose bound to that outline.
+- **New:** `DemonReadingOutline.cs` — `DemonOutlineRoot` / `DemonLineOutline`; `DemonReadingOutlineParser.TryParse` (strip to first `{`…last `}`, `JsonUtility.FromJson`, validate `theme_family` ∈ greed|vanity|chaos|power, anchors, optional `line` index).
+- **New:** `DemonTarotTwoPass.cs` — `CoGenerate`: if two-pass off or empty spread → single `BuildReadingPrompt`; else outline prompt → parse → on failure **fallback** to single pass (warning log); else `JsonUtility.ToJson(parsed)` + `BuildReadingSecondPassProsePrompt` + second generate. Nested waits use `ollama.StartCoroutine(ollama.GenerateWait(...))`.
+- **`DemonTarotPrompts`:** `BuildReadingOutlinePrompt` (pass 1), `BuildReadingSecondPassProsePrompt` (pass 2, embeds canonical outline JSON).
+- **`DemonTarotReader`:** `[SerializeField] bool useTwoPassReading` (default on); `RequestDemonReading` drives `StartCoroutine` → `StartCoroutine(DemonTarotTwoPass.CoGenerate(...))`; `_requestInFlight` cleared in `finally`.
+- **`TarotReadingDuelPipeline`:** `[SerializeField] bool useTwoPassDemonReading` (default on); demon step uses `DemonTarotTwoPass.CoGenerate` instead of a lone `BuildReadingPrompt` + `GenerateWait`.
+- **Tradeoffs:** Two Ollama round-trips when two-pass is on; if the model returns unparseable outline JSON, behavior falls back to the original single-pass demon prompt.
+
+### Documentation baseline (same session)
+- Synced **`PLAN.md`** (current state: Ollama, duel prototype, two-pass demon — removed stale “no Ollama / no judge” lines), **`README.md`** (two-pass toggles and script names), **`requirements.txt`** (two-pass + fallback), and this **`RUNNING_LOG.md`** per the standing decision to maintain `PLAN.md` / `README.md` / `RUNNING_LOG.md` / `requirements.txt` together.

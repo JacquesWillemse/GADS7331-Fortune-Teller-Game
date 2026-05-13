@@ -4,16 +4,25 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 
 /// <summary>
-/// Rule-based duel totals: magic power (player), per-card moral tilt, per-card theme identification,
-/// and how on-brief each fortune is for help (player) vs harm (demon).
+/// Rule-based duel totals: magic power (player), per-card moral tilt from **printed** card leans (Good/Neutral/Bad),
+/// per-card theme identification (abstract lane lexicon — avoids absurd card-caption bingo), hope-vs-harm alignment,
+/// moral spread judge bias, and a small **all-Neutral draw** bonus when the teller shows real hope (see <see cref="FormatRationale"/>).
+/// Energy 0–100 adds player bonus; 100 = automatic teller win.
 /// </summary>
 public static class FortuneDuelRubric
 {
     public const int MoralCardBonus = 10;
+    /// <summary>When the spread has more Good than Bad cards, this many points go to the teller; vice versa for Bad over Good.</summary>
+    public const int MoralSpreadJudgeBiasPoints = 15;
     /// <summary>Magical energy 0–100 maps to this many bonus points on the player total (at 100, <see cref="IsGuaranteedPlayerWin"/> instead).</summary>
     public const int MagicalEnergyMaxBonusPoints = 50;
-    public const int MaxThemeIdentificationPerCard = 10;
+    /// <summary>Ceiling per card for theme weave; curve saturates below old 10 to reduce thesaurus-padding wins.</summary>
+    public const int MaxThemeIdentificationPerCard = 8;
     public const int MaxAlignment = 20;
+    /// <summary>When every drawn card is Neutral and the teller shows enough hope-language, the booth steadies the goodwill.</summary>
+    public const int NeutralSpreadTellerBonus = 4;
+    /// <summary>Minimum distinct hope-token hits on the teller text to earn <see cref="NeutralSpreadTellerBonus"/>.</summary>
+    public const int NeutralSpreadHopeHitsRequired = 2;
 
     /// <summary>Slider at 100 → player wins regardless of computed totals.</summary>
     public static bool IsGuaranteedPlayerWin(float magicalEnergy0to100) =>
@@ -22,32 +31,33 @@ public static class FortuneDuelRubric
     static readonly string[] GreedTokens =
     {
         "greed", "hunger", "feast", "feasting", "glutton", "gold", "coin", "coins", "wealth", "covet",
-        "avarice", "devour", "banquet", "meal", "meals", "succulent", "deep-fry", "fry"
+        "avarice", "devour", "banquet", "meal", "meals"
     };
 
     static readonly string[] VanityTokens =
     {
-        "vanity", "mirror", "pride", "ego", "beauty", "appearance", "hair", "mohawk", "admired", "waxing",
-        "groom", "image", "vain", "looks"
+        "vanity", "mirror", "pride", "ego", "beauty", "appearance", "image", "vain", "looks", "surface",
+        "reflection", "mask"
     };
 
     static readonly string[] ChaosTokens =
     {
         "chaos", "disorder", "storm", "wild", "spiral", "chance", "fray", "tumble", "mayhem", "wreck",
-        "shatter", "snap", "cold snap", "retirement", "michelin", "wrestling", "crowd"
+        "shatter", "snap"
     };
 
     static readonly string[] PowerTokens =
     {
-        "power", "control", "throne", "crown", "rule", "dominion", "command", "chain", "remote", "weight",
-        "heavy", "authority", "grip", "reign", "farmer", "shooting"
+        "power", "control", "throne", "crown", "rule", "dominion", "command", "chain", "weight",
+        "heavy", "authority", "grip", "reign", "burden", "decree", "yoke", "rank"
     };
 
     static readonly string[] HopeHelpTokens =
     {
         "hope", "prosper", "peace", "heal", "light", "bless", "blessing", "kindness", "better", "grow",
         "strength", "courage", "guide", "balance", "agency", "walk lightly", "navigate", "uplift", "safe",
-        "steady", "renew", "care", "warmth", "together", "support"
+        "steady", "renew", "care", "warmth", "together", "support", "free", "freed", "fortune", "forgive",
+        "forgiveness", "release", "relief"
     };
 
     static readonly string[] HarmDoomTokens =
@@ -57,7 +67,7 @@ public static class FortuneDuelRubric
         "darkness", "succumb", "excess", "corruption"
     };
 
-    /// <summary>Computes both sides' totals from spread data and the two readings.</summary>
+    /// <summary>Computes both sides' totals from spread data and the two readings. Moral card tilt uses printed leans; theme/alignment use reading text (include spirit's full reply, e.g. overall moral read sentence).</summary>
     /// <param name="magicalEnergy0to100">0–100 from UI; adds up to <see cref="MagicalEnergyMaxBonusPoints"/> to the player; 100 = guaranteed win (see <see cref="IsGuaranteedPlayerWin"/>).</param>
     public static FortuneDuelScoreBreakdown Compute(
         IReadOnlyList<TarotCardData> spread,
@@ -97,11 +107,58 @@ public static class FortuneDuelRubric
         int pAlign = AlignmentForPlayer(pNorm);
         int dAlign = AlignmentForDemon(dNorm);
 
-        int pTotal = magic + pMoral + pTheme + pAlign;
-        int dTotal = dMoral + dTheme + dAlign;
+        MoralSpreadJudgeBias(spread, out int pJudgeBias, out int dJudgeBias);
+
+        int neutralBonus = ComputeNeutralSpreadTellerBonus(spread, pNorm);
+        int pTotal = magic + pMoral + pTheme + pAlign + pJudgeBias + neutralBonus;
+        int dTotal = dMoral + dTheme + dAlign + dJudgeBias;
 
         return new FortuneDuelScoreBreakdown(
-            magic, pMoral, dMoral, pTheme, dTheme, pAlign, dAlign, pTotal, dTotal);
+            magic, pMoral, dMoral, pTheme, dTheme, pAlign, dAlign, pJudgeBias, dJudgeBias, neutralBonus, pTotal, dTotal);
+    }
+
+    /// <summary>All drawn lines Neutral + teller shows real hope → small booth bonus so neutral spreads are not pure token DPS races.</summary>
+    static int ComputeNeutralSpreadTellerBonus(IReadOnlyList<TarotCardData> spread, string playerCorpusNorm)
+    {
+        if (spread == null || spread.Count == 0)
+            return 0;
+        for (int i = 0; i < spread.Count; i++)
+        {
+            if (spread[i].cardMoral != TarotMoral.Neutral)
+                return 0;
+        }
+
+        if (CountBoundaryHits(playerCorpusNorm, HopeHelpTokens) < NeutralSpreadHopeHitsRequired)
+            return 0;
+        return NeutralSpreadTellerBonus;
+    }
+
+    /// <summary>More Good than Bad cards on the spread favors the teller; more Bad than Good favors the spirit; ties or neutral-only give no bias.</summary>
+    static void MoralSpreadJudgeBias(IReadOnlyList<TarotCardData> spread, out int playerBonus, out int demonBonus)
+    {
+        playerBonus = 0;
+        demonBonus = 0;
+        if (spread == null)
+            return;
+
+        int good = 0, bad = 0;
+        for (int i = 0; i < spread.Count; i++)
+        {
+            switch (spread[i].cardMoral)
+            {
+                case TarotMoral.Good:
+                    good++;
+                    break;
+                case TarotMoral.Bad:
+                    bad++;
+                    break;
+            }
+        }
+
+        if (good > bad)
+            playerBonus = MoralSpreadJudgeBiasPoints;
+        else if (bad > good)
+            demonBonus = MoralSpreadJudgeBiasPoints;
     }
 
     public static string FormatRationale(FortuneDuelScoreBreakdown s, bool playerWon, float magicalEnergy0to100 = -1f, bool guaranteedFromEnergy = false)
@@ -115,7 +172,15 @@ public static class FortuneDuelRubric
             sb.AppendLine($"Magical energy (slider 0–100): {Mathf.Clamp(magicalEnergy0to100, 0f, 100f):0}.");
         sb.AppendLine($"Magical bonus on player total (0–{MagicalEnergyMaxBonusPoints} from energy): +{s.PlayerMagicPower}");
         sb.AppendLine($"Moral tilt from drawn cards: player +{s.PlayerMoralFromCards} (Good +{MoralCardBonus} each), spirit +{s.DemonMoralFromCards} (Bad +{MoralCardBonus} each), Neutral +0.");
-        sb.AppendLine($"Theme identification (per card, keyed to Greed / Vanity / Chaos / Power): player +{s.PlayerThemeIdentification}, spirit +{s.DemonThemeIdentification}.");
+        sb.AppendLine("Morality layers — (1) **Card values:** each line's printed moral lean (Good / Neutral / Bad) feeds the tilt above and the spread judge bias below; those counts are fixed from data.");
+        sb.AppendLine("(2) **Interpretation:** the teller and spirit passages are scored separately for theme weave and hope-vs-harm alignment from their wording. The spirit's closing **overall moral read** of the draw (prose) is **additive** color for the booth judge: it must not replace or override the printed leans, but helps read intent alongside them.");
+        if (s.PlayerSpreadMoralJudgeBias > 0)
+            sb.AppendLine($"Moral judge bias (more Good than Bad on the draw): +{s.PlayerSpreadMoralJudgeBias} to teller.");
+        if (s.DemonSpreadMoralJudgeBias > 0)
+            sb.AppendLine($"Moral judge bias (more Bad than Good on the draw): +{s.DemonSpreadMoralJudgeBias} to spirit.");
+        if (s.PlayerNeutralSpreadBonus > 0)
+            sb.AppendLine($"Neutral-draw booth steadiness (teller hope, all Neutral lines): +{s.PlayerNeutralSpreadBonus} to teller.");
+        sb.AppendLine($"Theme identification (per card, max {MaxThemeIdentificationPerCard} each; abstract lane lexicon): player +{s.PlayerThemeIdentification}, spirit +{s.DemonThemeIdentification}.");
         sb.AppendLine($"Fortune alignment (help-lane vs harm-lane, max {MaxAlignment} each): player +{s.PlayerAlignment}, spirit +{s.DemonAlignment}.");
         sb.AppendLine($"Totals — player {s.PlayerTotal}, spirit {s.DemonTotal}.");
         return sb.ToString().TrimEnd();
@@ -166,9 +231,9 @@ public static class FortuneDuelRubric
         if (hits <= 0)
             return 0;
         if (hits == 1)
-            return 4;
+            return 3;
         if (hits == 2)
-            return 7;
+            return 5;
         return MaxThemeIdentificationPerCard;
     }
 
@@ -233,6 +298,10 @@ public readonly struct FortuneDuelScoreBreakdown
     public readonly int DemonThemeIdentification;
     public readonly int PlayerAlignment;
     public readonly int DemonAlignment;
+    public readonly int PlayerSpreadMoralJudgeBias;
+    public readonly int DemonSpreadMoralJudgeBias;
+    /// <summary>Included in <see cref="PlayerTotal"/>; from all-Neutral spread + hope hits on teller text.</summary>
+    public readonly int PlayerNeutralSpreadBonus;
     public readonly int PlayerTotal;
     public readonly int DemonTotal;
 
@@ -244,6 +313,9 @@ public readonly struct FortuneDuelScoreBreakdown
         int demonThemeIdentification,
         int playerAlignment,
         int demonAlignment,
+        int playerSpreadMoralJudgeBias,
+        int demonSpreadMoralJudgeBias,
+        int playerNeutralSpreadBonus,
         int playerTotal,
         int demonTotal)
     {
@@ -254,6 +326,9 @@ public readonly struct FortuneDuelScoreBreakdown
         DemonThemeIdentification = demonThemeIdentification;
         PlayerAlignment = playerAlignment;
         DemonAlignment = demonAlignment;
+        PlayerSpreadMoralJudgeBias = playerSpreadMoralJudgeBias;
+        DemonSpreadMoralJudgeBias = demonSpreadMoralJudgeBias;
+        PlayerNeutralSpreadBonus = playerNeutralSpreadBonus;
         PlayerTotal = playerTotal;
         DemonTotal = demonTotal;
     }
