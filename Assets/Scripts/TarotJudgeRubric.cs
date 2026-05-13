@@ -17,6 +17,6 @@ public static class TarotJudgeRubric
 
     /// <summary>Design notes for prompts / UI (not enforced in code beyond sums).</summary>
     public const string RubricSummary =
-        "TarotReadingDuelPipeline uses FortuneDuelRubric (magic + moral card tilt + theme lexicon hits + alignment), not this JSON rubric. " +
-        "Legacy LLM judge JSON (TarotJudgePrompts / TryParseJudge / SumJudgeSide) remains in code for experiments: per-side total was clamped subscores + player energy only.";
+        "Duel scoring uses FortuneDuelRubric: magical energy 0–100 maps to up to 50 player bonus points; energy ≥ 99.5 guarantees a player win. " +
+        "Legacy LLM judge JSON (TarotJudgePrompts / TryParseJudge / SumJudgeSide) remains for experiments.";
 }

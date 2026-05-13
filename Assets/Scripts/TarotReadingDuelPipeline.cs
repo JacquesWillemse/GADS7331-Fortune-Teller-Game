@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
@@ -32,7 +31,7 @@ public class TarotReadingDuelPipeline : MonoBehaviour
     [SerializeField] private Key runDuelKey = Key.J;
 
     [Header("Fortune duel scoring")]
-    [Tooltip("Magic power: flat 0–10 added to the player’s total (same serialized field as before).")]
+    [Tooltip("Legacy dev slider: 0–10 maps to 0–100 magical energy for FortuneDuelRubric when using this pipeline directly.")]
     [SerializeField, Range(0, 10)] private int playerEnergyBonusForJudge;
     [Tooltip("When totals tie, the player wins if true.")]
     [SerializeField] private bool tieRoundGoesToPlayer = true;
@@ -195,41 +194,32 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             _spread,
             playerReading,
             demonText ?? "",
-            playerEnergyBonusForJudge);
+            Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f));
 
-        bool playerWon = duel.PlayerTotal > duel.DemonTotal
-            ? true
-            : duel.DemonTotal > duel.PlayerTotal
-                ? false
-                : tieRoundGoesToPlayer;
+        float energyUi = Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f);
+        bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energyUi);
+        bool playerWon = guaranteed
+            || (!guaranteed && duel.PlayerTotal > duel.DemonTotal)
+            || (!guaranteed && duel.PlayerTotal == duel.DemonTotal && tieRoundGoesToPlayer);
 
-        string rationale = FortuneDuelRubric.FormatRationale(duel, playerWon);
-        string scoreSummary =
-            $"Player total={duel.PlayerTotal} (magic {duel.PlayerMagicPower}, moral {duel.PlayerMoralFromCards}, theme {duel.PlayerThemeIdentification}, align {duel.PlayerAlignment}) | " +
-            $"Demon total={duel.DemonTotal} (moral {duel.DemonMoralFromCards}, theme {duel.DemonThemeIdentification}, align {duel.DemonAlignment})";
+        string explanation = FortuneDuelRubric.BuildVerdictExplanationOneSentence(duel, playerWon, guaranteed, tieRoundGoesToPlayer);
+        string detailLog = FortuneDuelRubric.FormatRationale(duel, playerWon, energyUi, guaranteed);
 
         if (judgeResultText != null)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine(playerWon ? "Winner: Player" : "Winner: Demon");
-            if (!string.IsNullOrEmpty(scoreSummary))
-                sb.AppendLine(scoreSummary);
-            sb.AppendLine(rationale);
-            judgeResultText.text = sb.ToString().Trim();
+            judgeResultText.text =
+                (playerWon ? "Winner: Player" : "Winner: Spirit") + "\n" + explanation;
         }
 
         SetStatus("Complete.");
 
         if (logGateAndJudgeToConsole)
         {
-            string w = playerWon ? "Player" : "Demon";
-            if (!string.IsNullOrEmpty(scoreSummary))
-                Debug.Log($"[Duel][Judge] winner={w} | {scoreSummary} | rationale: {rationale}");
-            else
-                Debug.Log($"[Duel][Judge] winner={w} | rationale: {rationale}");
+            string w = playerWon ? "Player" : "Spirit";
+            Debug.Log($"[Duel][Judge] winner={w} | {explanation}\n{detailLog}");
         }
 
-        onJudgeComplete?.Invoke(playerWon, rationale);
+        onJudgeComplete?.Invoke(playerWon, explanation);
         _busy = false;
     }
 
@@ -247,11 +237,20 @@ public class TarotReadingDuelPipeline : MonoBehaviour
 
     private void ApplyDemonReadingToUi(string demonText)
     {
-        if (demonReadingText != null)
-            demonReadingText.text = demonText;
+        ApplyTmp(demonReadingText, demonText);
         if (demonReadingOutputFallback != null && demonReadingOutputFallback.DemonOutputText != null &&
             demonReadingOutputFallback.DemonOutputText != demonReadingText)
-            demonReadingOutputFallback.DemonOutputText.text = demonText;
+            ApplyTmp(demonReadingOutputFallback.DemonOutputText, demonText);
+    }
+
+    static void ApplyTmp(TMP_Text t, string s)
+    {
+        if (t == null)
+            return;
+        if (!t.gameObject.activeSelf)
+            t.gameObject.SetActive(true);
+        t.text = s;
+        t.ForceMeshUpdate(true);
     }
 
     private void ClearOutputs()

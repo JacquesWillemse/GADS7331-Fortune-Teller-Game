@@ -1,10 +1,8 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 public class TarotCardPull : MonoBehaviour
@@ -17,6 +15,9 @@ public class TarotCardPull : MonoBehaviour
     public TMP_Text[] cardDescriptions;
     public Image[] cardImages;
     public TarotMoral[] cardMorality;
+
+    [Tooltip("Invoked after all cards in the pull have been revealed.")]
+    public UnityEvent onCardPullComplete;
 
     private int cardDrawsAmount = 3;
     private int cardCount = 0;
@@ -60,6 +61,8 @@ public class TarotCardPull : MonoBehaviour
 
             yield return new WaitForSeconds(0.5f);
         }
+
+        onCardPullComplete?.Invoke();
     }
 
     private int RandomCard()

@@ -10,9 +10,14 @@ using UnityEngine;
 public static class FortuneDuelRubric
 {
     public const int MoralCardBonus = 10;
-    public const int MaxMagicPowerPlayer = 10;
+    /// <summary>Magical energy 0–100 maps to this many bonus points on the player total (at 100, <see cref="IsGuaranteedPlayerWin"/> instead).</summary>
+    public const int MagicalEnergyMaxBonusPoints = 50;
     public const int MaxThemeIdentificationPerCard = 10;
     public const int MaxAlignment = 20;
+
+    /// <summary>Slider at 100 → player wins regardless of computed totals.</summary>
+    public static bool IsGuaranteedPlayerWin(float magicalEnergy0to100) =>
+        magicalEnergy0to100 >= 99.5f;
 
     static readonly string[] GreedTokens =
     {
@@ -48,21 +53,25 @@ public static class FortuneDuelRubric
     static readonly string[] HarmDoomTokens =
     {
         "ruin", "doom", "curse", "decay", "rot", "wither", "shame", "dread", "corrupt", "hollow", "trap",
-        "fall", "die", "death", "devour", "consume", "desolate", "shatter", "bleak",         "hunger for", "bones",
+        "fall", "die", "death", "devour", "consume", "desolate", "shatter", "bleak", "hunger for", "bones",
         "darkness", "succumb", "excess", "corruption"
     };
 
     /// <summary>Computes both sides' totals from spread data and the two readings.</summary>
+    /// <param name="magicalEnergy0to100">0–100 from UI; adds up to <see cref="MagicalEnergyMaxBonusPoints"/> to the player; 100 = guaranteed win (see <see cref="IsGuaranteedPlayerWin"/>).</param>
     public static FortuneDuelScoreBreakdown Compute(
         IReadOnlyList<TarotCardData> spread,
         string playerReading,
         string demonReading,
-        int magicPower0to10)
+        float magicalEnergy0to100)
     {
         string pNorm = NormalizeCorpus(playerReading);
         string dNorm = NormalizeCorpus(demonReading);
 
-        int magic = Mathf.Clamp(magicPower0to10, 0, MaxMagicPowerPlayer);
+        float e = Mathf.Clamp(magicalEnergy0to100, 0f, 100f);
+        int magic = IsGuaranteedPlayerWin(e)
+            ? 0
+            : Mathf.Clamp(Mathf.RoundToInt(e / 100f * MagicalEnergyMaxBonusPoints), 0, MagicalEnergyMaxBonusPoints);
         int pMoral = 0;
         int dMoral = 0;
         int pTheme = 0;
@@ -95,16 +104,50 @@ public static class FortuneDuelRubric
             magic, pMoral, dMoral, pTheme, dTheme, pAlign, dAlign, pTotal, dTotal);
     }
 
-    public static string FormatRationale(FortuneDuelScoreBreakdown s, bool playerWon)
+    public static string FormatRationale(FortuneDuelScoreBreakdown s, bool playerWon, float magicalEnergy0to100 = -1f, bool guaranteedFromEnergy = false)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(playerWon ? "Verdict: the fortune teller edges the duel." : "Verdict: the demon edges the duel.");
-        sb.AppendLine($"Magic power (player only): +{s.PlayerMagicPower}");
-        sb.AppendLine($"Moral tilt from drawn cards: player +{s.PlayerMoralFromCards} (Good +{MoralCardBonus} each), demon +{s.DemonMoralFromCards} (Bad +{MoralCardBonus} each), Neutral +0.");
-        sb.AppendLine($"Theme identification (per card, keyed to Greed / Vanity / Chaos / Power): player +{s.PlayerThemeIdentification}, demon +{s.DemonThemeIdentification}.");
-        sb.AppendLine($"Fortune alignment (help-lane vs harm-lane, max {MaxAlignment} each): player +{s.PlayerAlignment}, demon +{s.DemonAlignment}.");
-        sb.AppendLine($"Totals — player {s.PlayerTotal}, demon {s.DemonTotal}.");
+        if (guaranteedFromEnergy)
+            sb.AppendLine("Verdict: magical energy at 100 — the player wins by decree.");
+        else
+            sb.AppendLine(playerWon ? "Verdict: the fortune teller edges the duel." : "Verdict: the spirit edges the duel.");
+        if (magicalEnergy0to100 >= 0f)
+            sb.AppendLine($"Magical energy (slider 0–100): {Mathf.Clamp(magicalEnergy0to100, 0f, 100f):0}.");
+        sb.AppendLine($"Magical bonus on player total (0–{MagicalEnergyMaxBonusPoints} from energy): +{s.PlayerMagicPower}");
+        sb.AppendLine($"Moral tilt from drawn cards: player +{s.PlayerMoralFromCards} (Good +{MoralCardBonus} each), spirit +{s.DemonMoralFromCards} (Bad +{MoralCardBonus} each), Neutral +0.");
+        sb.AppendLine($"Theme identification (per card, keyed to Greed / Vanity / Chaos / Power): player +{s.PlayerThemeIdentification}, spirit +{s.DemonThemeIdentification}.");
+        sb.AppendLine($"Fortune alignment (help-lane vs harm-lane, max {MaxAlignment} each): player +{s.PlayerAlignment}, spirit +{s.DemonAlignment}.");
+        sb.AppendLine($"Totals — player {s.PlayerTotal}, spirit {s.DemonTotal}.");
         return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>One sentence for judge UI (no score dump). Caller usually prefixes with the winner line.</summary>
+    public static string BuildVerdictExplanationOneSentence(
+        FortuneDuelScoreBreakdown s,
+        bool playerWon,
+        bool guaranteedPlayerWin,
+        bool tieRoundGoesToPlayer)
+    {
+        if (guaranteedPlayerWin)
+            return "Magical energy at its peak settles the round for the teller before the tally is weighed.";
+
+        if (s.PlayerTotal == s.DemonTotal)
+        {
+            if (playerWon && tieRoundGoesToPlayer)
+                return "The ledger is dead even, so the tent's tie-law keeps the goodwill with the teller.";
+            if (!playerWon && !tieRoundGoesToPlayer)
+                return "The ledger is dead even, so the tent's tie-law tips the omen toward the spirit.";
+            // Equal totals but tie rule gave opposite side (should not happen with consistent rules)
+            return playerWon
+                ? "The scores matched, yet the reading still leans the booth's favor toward the teller."
+                : "The scores matched, yet the reading still leans the booth's favor toward the spirit.";
+        }
+
+        int diff = Mathf.Abs(s.PlayerTotal - s.DemonTotal);
+        if (playerWon)
+            return $"The teller leads the spirit by {diff} point{(diff == 1 ? "" : "s")}, weaving hope and the draw more tightly than the curse.";
+
+        return $"The spirit leads the teller by {diff} point{(diff == 1 ? "" : "s")}, sinking dread and the drawn themes deeper than the hopeful lines.";
     }
 
     static string NormalizeCorpus(string s)
