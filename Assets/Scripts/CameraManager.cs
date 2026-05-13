@@ -5,10 +5,13 @@ public class CameraManager : MonoBehaviour
     [SerializeField] private Camera tentCamera;
     [SerializeField] private Camera bookCamera;
     [SerializeField] private Camera cardCamera;
+    [SerializeField] private Camera spiritCamera;
+    [SerializeField] private Camera judgeCamera;
 
     [SerializeField] private UIManager uiManager;
     [SerializeField] private Canvas panelBook;
     [SerializeField] private Canvas panelMain;
+    [SerializeField] private Canvas panelJudge;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -20,8 +23,11 @@ public class CameraManager : MonoBehaviour
         tentCamera.gameObject.SetActive(false);
         bookCamera.gameObject.SetActive(false);
         cardCamera.gameObject.SetActive(false);
+        spiritCamera.gameObject.SetActive(false);
+        judgeCamera.gameObject.SetActive(false);
         uiManager.HideCardPanel();
         panelBook.gameObject.SetActive(false);
+        panelJudge.gameObject.SetActive(false);
     }
 
     public void ActivateTentCamera()
@@ -43,5 +49,18 @@ public class CameraManager : MonoBehaviour
         DisableAllCameras();
         cardCamera.gameObject.SetActive(true);
         uiManager.ShowCardPanel();
+    }
+
+    public void ActivateSpiritCamera()
+    {
+        DisableAllCameras();
+        spiritCamera.gameObject.SetActive(true);
+    }
+
+    public void ActivateJudgeCamera()
+    {
+        DisableAllCameras();
+        judgeCamera.gameObject.SetActive(true);
+        panelJudge.gameObject.SetActive(true);
     }
 }

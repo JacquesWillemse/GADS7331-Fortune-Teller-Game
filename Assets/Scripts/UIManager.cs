@@ -11,6 +11,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] Button tentBtn;
     [SerializeField] Button cardsBtn;
     [SerializeField] Button wisdonBookBtn;
+    [SerializeField] Button spiritBtn;
+    [SerializeField] Button judgeBtn;
 
     //Panels
     [SerializeField] GameObject cardUI;
@@ -26,6 +28,8 @@ public class UIManager : MonoBehaviour
         tentBtn.onClick.AddListener(TentPressed);
         cardsBtn.onClick.AddListener(CardsPressed);
         wisdonBookBtn.onClick.AddListener(WisdomBooksPressed);
+        spiritBtn.onClick.AddListener(SpiritPressed);
+        judgeBtn.onClick.AddListener(JudgePressed);
     }
 
     // Update is called once per frame
@@ -57,6 +61,14 @@ public class UIManager : MonoBehaviour
 
     }
     void WisdomBooksPressed()
+    {
+
+    }
+    void SpiritPressed()
+    {
+
+    }
+    void JudgePressed()
     {
 
     }
