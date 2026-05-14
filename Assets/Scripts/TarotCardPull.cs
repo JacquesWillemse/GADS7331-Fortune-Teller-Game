@@ -9,59 +9,98 @@ public class TarotCardPull : MonoBehaviour
 {
     public TarotCards tarotDatabase;
 
-    //CardData
     public GameObject[] CardHolders;
 
     public TMP_Text[] cardDescriptions;
     public Image[] cardImages;
     public TarotMoral[] cardMorality;
 
+    [SerializeField] private GameObject cardOne;
+    [SerializeField] private GameObject cardTwo;
+    [SerializeField] private GameObject cardThree;
+
     [Tooltip("Invoked after all cards in the pull have been revealed.")]
     public UnityEvent onCardPullComplete;
 
-    private int cardDrawsAmount = 3;
-    private int cardCount = 0;
+    const int CardDrawsAmount = 3;
 
-    private List<int> cardPulls = new List<int>();
-    private int randomIndex;
+    int _cardCount;
+    readonly List<int> _cardPulls = new List<int>();
+    Coroutine _pullRoutine;
 
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        cardCount = tarotDatabase.cards.Count;
-        //CardPull();
+        _cardCount = tarotDatabase != null ? tarotDatabase.cards.Count : 0;
+        HideCards();
     }
 
-    // Update is called once before the first execution of Update after MonoBehaviour is created
-    void Update()
-    {
-        
-    }
     /// <summary>Clears duplicate-avoidance list so a new tent session can draw again.</summary>
     public void ClearPullHistory()
     {
-        cardPulls.Clear();
+        _cardPulls.Clear();
+    }
+
+    /// <summary>Hides per-slot visuals (scene card objects + <see cref="CardHolders"/>). Call on reset and before a new pull.</summary>
+    public void HideCards()
+    {
+        SetIndividualCardVisible(0, false);
+        SetIndividualCardVisible(1, false);
+        SetIndividualCardVisible(2, false);
+
+        if (CardHolders != null)
+        {
+            for (int i = 0; i < CardHolders.Length; i++)
+            {
+                if (CardHolders[i] != null)
+                    CardHolders[i].SetActive(false);
+            }
+        }
+    }
+
+    public void ShowCards()
+    {
+        SetIndividualCardVisible(0, true);
+        SetIndividualCardVisible(1, true);
+        SetIndividualCardVisible(2, true);
+
+        if (CardHolders != null)
+        {
+            for (int i = 0; i < CardHolders.Length; i++)
+            {
+                if (CardHolders[i] != null)
+                    CardHolders[i].SetActive(true);
+            }
+        }
     }
 
     public void CardPull()
     {
-        StartCoroutine(CardPullCoroutine());
+        if (_pullRoutine != null)
+            StopCoroutine(_pullRoutine);
+        _pullRoutine = StartCoroutine(CardPullCoroutine());
     }
 
-    private IEnumerator CardPullCoroutine()
+    IEnumerator CardPullCoroutine()
     {
-        TarotCardData card;
+        HideCards();
 
-        for (int i = 0; i < cardDrawsAmount; i++)
+        for (int i = 0; i < CardDrawsAmount; i++)
         {
-            card = tarotDatabase.cards[RandomCard()];
+            if (tarotDatabase == null || tarotDatabase.cards == null || _cardCount <= 0)
+                break;
 
-            cardDescriptions[i].text = card.cardName;
-            cardImages[i].sprite = card.tarotCardImage;
-            cardMorality[i] = card.cardMoral;
+            TarotCardData card = tarotDatabase.cards[RandomCard()];
 
-            CardHolders[i].SetActive(true);
+            if (cardDescriptions != null && i < cardDescriptions.Length && cardDescriptions[i] != null)
+                cardDescriptions[i].text = card.cardName;
+            if (cardImages != null && i < cardImages.Length && cardImages[i] != null)
+                cardImages[i].sprite = card.tarotCardImage;
+            if (cardMorality != null && i < cardMorality.Length)
+                cardMorality[i] = card.cardMoral;
+
+            if (CardHolders != null && i < CardHolders.Length && CardHolders[i] != null)
+                CardHolders[i].SetActive(true);
+            SetIndividualCardVisible(i, true);
 
             Debug.Log(card.cardTheme);
 
@@ -69,16 +108,40 @@ public class TarotCardPull : MonoBehaviour
         }
 
         onCardPullComplete?.Invoke();
+        _pullRoutine = null;
     }
 
-    private int RandomCard()
+    void SetIndividualCardVisible(int index, bool visible)
     {
+        GameObject go = index switch
+        {
+            0 => cardOne,
+            1 => cardTwo,
+            2 => cardThree,
+            _ => null
+        };
+        if (go != null)
+            go.SetActive(visible);
+    }
+
+    int RandomCard()
+    {
+        if (_cardCount <= 0)
+            return 0;
+
+        if (_cardPulls.Count >= _cardCount)
+            _cardPulls.Clear();
+
+        int randomIndex;
+        int guard = 0;
         do
         {
-            randomIndex = UnityEngine.Random.Range(0, cardCount);
-        }
-        while (cardPulls.Contains(randomIndex));
-        cardPulls.Add(randomIndex);
+            randomIndex = Random.Range(0, _cardCount);
+            if (++guard > 64)
+                break;
+        } while (_cardPulls.Contains(randomIndex));
+
+        _cardPulls.Add(randomIndex);
         return randomIndex;
     }
 }

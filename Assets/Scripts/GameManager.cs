@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -30,10 +31,18 @@ public class GameManager : MonoBehaviour
     [Tooltip("HUD label for current customer count (e.g. CustomerUpdate TMP).")]
     [SerializeField] private TMP_Text customersCountText;
 
+    [Header("Verdict delta flash (optional)")]
+    [Tooltip("Shown for 2s after Accept Verdict with the energy change for that verdict (e.g. +5).")]
+    [SerializeField] private TMP_Text energyUpdate;
+    [Tooltip("Shown for 2s after Accept Verdict with the customer change for that verdict (e.g. +1, -1).")]
+    [SerializeField] private TMP_Text customerUpdate;
+    [SerializeField] private float verdictDeltaFlashSeconds = 2f;
+
     int _energy;
     int _customers;
     bool _cardsDrawn;
     bool _gameComplete;
+    Coroutine _verdictDeltaFlashRoutine;
 
     public int Energy => _energy;
     public int Customers => _customers;
@@ -47,6 +56,16 @@ public class GameManager : MonoBehaviour
     void Awake()
     {
         ApplyStartingResources();
+        if (energyUpdate != null)
+            energyUpdate.enabled = false;
+        if (customerUpdate != null)
+            customerUpdate.enabled = false;
+    }
+
+    void OnDestroy()
+    {
+        if (_verdictDeltaFlashRoutine != null)
+            StopCoroutine(_verdictDeltaFlashRoutine);
     }
 
     void ApplyStartingResources()
@@ -79,6 +98,9 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        int energyBefore = _energy;
+        int customersBefore = _customers;
+
         if (playerWon)
         {
             // Teller beat the spirit in the rubric duel — attract another customer.
@@ -98,7 +120,11 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        int energyDelta = _energy - energyBefore;
+        int customerDelta = _customers - customersBefore;
+
         RaiseResources();
+        ShowVerdictDeltaFlash(energyDelta, customerDelta);
         fortuneFlow.ResetRoundAfterVerdictAccepted();
         _cardsDrawn = false;
         Debug.Log($"[GameManager] Verdict accepted. Energy={_energy} Customers={_customers} GameComplete={_gameComplete}");
@@ -147,6 +173,49 @@ public class GameManager : MonoBehaviour
             return;
         _gameComplete = value;
         onGameCompleteChanged?.Invoke(_gameComplete);
+    }
+
+    void ShowVerdictDeltaFlash(int energyDelta, int customerDelta)
+    {
+        if (energyUpdate == null && customerUpdate == null)
+            return;
+        if (_verdictDeltaFlashRoutine != null)
+            StopCoroutine(_verdictDeltaFlashRoutine);
+        _verdictDeltaFlashRoutine = StartCoroutine(VerdictDeltaFlashCo(energyDelta, customerDelta));
+    }
+
+    IEnumerator VerdictDeltaFlashCo(int energyDelta, int customerDelta)
+    {
+        string e = FormatSignedDelta(energyDelta);
+        string c = FormatSignedDelta(customerDelta);
+
+        if (energyUpdate != null)
+        {
+            energyUpdate.text = e;
+            energyUpdate.enabled = true;
+        }
+
+        if (customerUpdate != null)
+        {
+            customerUpdate.text = c;
+            customerUpdate.enabled = true;
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0.05f, verdictDeltaFlashSeconds));
+
+        if (energyUpdate != null)
+            energyUpdate.enabled = false;
+        if (customerUpdate != null)
+            customerUpdate.enabled = false;
+
+        _verdictDeltaFlashRoutine = null;
+    }
+
+    static string FormatSignedDelta(int delta)
+    {
+        if (delta > 0)
+            return "+" + delta;
+        return delta.ToString();
     }
 
 #if UNITY_EDITOR

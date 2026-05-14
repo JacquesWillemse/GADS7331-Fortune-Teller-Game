@@ -43,6 +43,8 @@ public class DemonTarotReader : MonoBehaviour
 
     private bool _requestInFlight;
     private readonly List<TarotCardData> _spreadBuffer = new List<TarotCardData>();
+    Coroutine _requestCoroutine;
+    int _requestGeneration;
 
     private void Start()
     {
@@ -109,27 +111,38 @@ public class DemonTarotReader : MonoBehaviour
         RequestDemonReading(_spreadBuffer, skipInitialOutput);
     }
 
+    /// <summary>Stops the in-flight LLM coroutine so a new draw / spirit request can run (e.g. player pulls cards again).</summary>
+    public void CancelActiveReading()
+    {
+        if (_requestCoroutine != null)
+        {
+            StopCoroutine(_requestCoroutine);
+            _requestCoroutine = null;
+        }
+
+        _requestInFlight = false;
+        _requestGeneration++;
+    }
+
     /// <summary>
     /// Demon interpretation for an arbitrary spread (later: inject player text + agreement gate).
     /// </summary>
     public void RequestDemonReading(IReadOnlyList<TarotCardData> cards, bool skipInitialOutput = false)
     {
-        if (_requestInFlight)
-        {
-            LogLine("DemonTarotReader: request already in flight.");
-            return;
-        }
         if (ollama == null || cards == null || cards.Count == 0)
             return;
 
+        CancelActiveReading();
+
         _requestInFlight = true;
+        int gen = _requestGeneration;
         if (!skipInitialOutput && !string.IsNullOrEmpty(initialLoadingMessage))
             SetOutput(initialLoadingMessage);
 
-        StartCoroutine(CoRequestDemonReading(cards));
+        _requestCoroutine = StartCoroutine(CoRequestDemonReading(cards, gen));
     }
 
-    IEnumerator CoRequestDemonReading(IReadOnlyList<TarotCardData> cards)
+    IEnumerator CoRequestDemonReading(IReadOnlyList<TarotCardData> cards, int generation)
     {
         try
         {
@@ -144,6 +157,9 @@ public class DemonTarotReader : MonoBehaviour
                 e => err = e,
                 null));
 
+            if (generation != _requestGeneration)
+                yield break;
+
             if (!string.IsNullOrEmpty(err))
             {
                 SetOutput(FormatError(err));
@@ -157,7 +173,11 @@ public class DemonTarotReader : MonoBehaviour
         }
         finally
         {
-            _requestInFlight = false;
+            if (generation == _requestGeneration)
+            {
+                _requestInFlight = false;
+                _requestCoroutine = null;
+            }
         }
     }
 

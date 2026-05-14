@@ -60,7 +60,6 @@ public class UIManager : MonoBehaviour
 
     void CardsPressed()
     {
-        // Start the spirit request while this UI (and FortuneFlow) may still be enabled; camera switches next.
         fortuneFlow?.OnCardsViewOpened();
         cameraManager?.ActivateCardCamera();
     }
@@ -72,7 +71,6 @@ public class UIManager : MonoBehaviour
 
     void SpiritPressed()
     {
-        // If the player opens Spirit without using the Cards tab, still request the reading once cards are drawn.
         fortuneFlow?.OnCardsViewOpened();
         cameraManager?.ActivateSpiritCamera();
     }

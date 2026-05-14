@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Tent flow: draw 3 cards → read fortune (player text UI, no score) → open Cards view to summon spirit prediction →
+/// Tent flow: draw 3 cards → read fortune (player text UI, no score) → spirit LLM starts only after Read Fortune → open Cards/Spirit view →
 /// open Judge view and press <see cref="RenderVerdict"/> when ready.
 /// Magical energy for the duel is chosen on the judge slider, then committed (subtracted from global run energy) when the player presses Read Fortune; <see cref="RenderVerdict"/> uses that committed amount.
 /// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy). Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
@@ -15,7 +15,7 @@ public class FortuneFlowController : MonoBehaviour
     [Header("Outputs (assign 3 TextMeshPro UGUI labels)")]
     [Tooltip("Filled when the player presses Read Fortune (from the input field).")]
     public TMP_Text playerFortuneOutput;
-    [Tooltip("Set to SpiritThinkingMessage when the spirit is requested; replaced when the LLM (or error) returns.")]
+    [Tooltip("Set to SpiritThinkingMessage when the spirit request starts (after Read Fortune); replaced when the model returns.")]
     public TMP_Text spiritFortuneOutput;
     [Tooltip("Optional mirror on Read Fortune, optional mirror when spirit responds, and the final verdict block from Render Verdict.")]
     public TMP_Text judgeOutput;
@@ -32,6 +32,8 @@ public class FortuneFlowController : MonoBehaviour
     [Header("Judge UI gate")]
     [Tooltip("Assign the same button that calls RenderVerdict (e.g. Make Judgement). Kept disabled until cards are drawn, fortune read, and spirit reply is present — blocks stray Submit / double wiring.")]
     [SerializeField] private Button renderVerdictButton;
+    [Tooltip("Pull Cards — disabled after a spread is drawn until Accept Verdict resets the round.")]
+    [SerializeField] private Button drawCardsButton;
 
     [Header("Player reading coach")]
     [Tooltip("If set, assigned to the TMP_InputField placeholder so players know to close with themes + moral lean twisted toward hope.")]
@@ -58,6 +60,11 @@ public class FortuneFlowController : MonoBehaviour
 
     /// <summary>Magical energy committed when the player pressed Read Fortune (deducted from global); used for <see cref="RenderVerdict"/> scoring.</summary>
     int _committedMagicalEnergyForDuel;
+    bool _spiritReadingStartedThisRound;
+    /// <summary>False from the moment a new pull starts until <see cref="ResetRoundAfterVerdictAccepted"/>.</summary>
+    bool _drawCardsAllowed = true;
+
+    const string DefaultSpiritThinkingMessage = "The spirit is thinking…";
 
     public bool CardsDrawn => _cardsDrawn;
 
@@ -76,6 +83,7 @@ public class FortuneFlowController : MonoBehaviour
     void Start()
     {
         ApplyPlayerFortunePlaceholderHint();
+        RefreshDrawCardsButtonInteractable();
         RefreshRenderVerdictButtonInteractable();
     }
 
@@ -132,10 +140,11 @@ public class FortuneFlowController : MonoBehaviour
         _cardsDrawn = true;
         gameManager?.SetCardsDrawn(true);
         LogFlow(outputStrings != null ? outputStrings.logCardsReady : null);
+        RefreshDrawCardsButtonInteractable();
         RefreshRenderVerdictButtonInteractable();
     }
 
-    /// <summary>Wired to Draw Cards button.</summary>
+    /// <summary>Wired to Draw Cards button. One pull per round; draw stays disabled until Accept Verdict.</summary>
     public void OnDrawCards()
     {
         if (cardPull == null)
@@ -144,17 +153,33 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
+        if (!_drawCardsAllowed)
+        {
+            LogFlow(!string.IsNullOrEmpty(outputStrings?.logDrawLockedUntilVerdict)
+                ? outputStrings.logDrawLockedUntilVerdict
+                : "You already pulled cards for this reading — accept the verdict to start the next customer.");
+            return;
+        }
+
+        spiritReader?.CancelActiveReading();
+
+        _drawCardsAllowed = false;
+        RefreshDrawCardsButtonInteractable();
+
         RefundCommittedMagicalEnergyIfAny();
         _cardsDrawn = false;
         _verdictAwaitingAccept = false;
         _playerFortuneForJudge = "";
+        _spiritReadingStartedThisRound = false;
         gameManager?.SetCardsDrawn(false);
         WriteTmp(playerFortuneOutput, "", nameof(FortuneFlowController));
         WriteTmp(spiritFortuneOutput, "", nameof(FortuneFlowController));
         WriteTmp(judgeOutput, "", nameof(FortuneFlowController));
+        cardPull.HideCards();
         cardPull.ClearPullHistory();
         cardPull.CardPull();
         LogFlow(outputStrings != null ? outputStrings.logDrawing : null);
+        RefreshDrawCardsButtonInteractable();
         RefreshRenderVerdictButtonInteractable();
     }
 
@@ -183,10 +208,12 @@ public class FortuneFlowController : MonoBehaviour
         if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorPlayerOnReadFormat))
             WriteTmp(judgeOutput, SafeFormat(outputStrings.judgeMirrorPlayerOnReadFormat, t), nameof(FortuneFlowController));
         LogFlow(outputStrings != null ? outputStrings.logAfterReadFortune : null);
+        if (_cardsDrawn)
+            TryBeginSpiritReadingAfterFortune();
         RefreshRenderVerdictButtonInteractable();
     }
 
-    /// <summary>Call when the Cards navigation opens (after <see cref="CameraManager.ActivateCardCamera"/>).</summary>
+    /// <summary>Call when the Cards or Spirit view opens. Starts the spirit only if Read Fortune has already run this round.</summary>
     public void OnCardsViewOpened()
     {
         if (!_cardsDrawn)
@@ -201,11 +228,39 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
-        if (outputStrings != null && spiritFortuneOutput != null)
-            WriteTmp(spiritFortuneOutput, outputStrings.spiritThinkingMessage ?? "", nameof(FortuneFlowController));
-        spiritReader.RequestFromPull(skipInitialOutput: true);
-        LogFlow(outputStrings != null ? outputStrings.logSpiritRequested : null);
+        if (string.IsNullOrEmpty(_playerFortuneForJudge))
+        {
+            LogFlow(!string.IsNullOrEmpty(outputStrings?.logReadFortuneBeforeSpirit)
+                ? outputStrings.logReadFortuneBeforeSpirit
+                : "Read your fortune (Make Reading) before summoning the spirit — the spirit starts only after that.");
+            return;
+        }
+
+        TryBeginSpiritReadingAfterFortune();
         RefreshRenderVerdictButtonInteractable();
+    }
+
+    void TryBeginSpiritReadingAfterFortune()
+    {
+        if (!_cardsDrawn || spiritReader == null)
+            return;
+        if (string.IsNullOrEmpty(_playerFortuneForJudge))
+            return;
+        if (_spiritReadingStartedThisRound)
+            return;
+
+        string thinking = ResolvedSpiritThinkingMessage();
+        WriteTmp(spiritFortuneOutput, thinking, nameof(FortuneFlowController));
+        spiritReader.RequestFromPull(skipInitialOutput: true);
+        _spiritReadingStartedThisRound = true;
+        LogFlow(outputStrings != null ? outputStrings.logSpiritRequested : null);
+    }
+
+    string ResolvedSpiritThinkingMessage()
+    {
+        if (outputStrings != null && !string.IsNullOrWhiteSpace(outputStrings.spiritThinkingMessage))
+            return outputStrings.spiritThinkingMessage.Trim();
+        return DefaultSpiritThinkingMessage;
     }
 
     /// <summary>Wired to a button on the Judge panel (e.g. "Render Verdict"). Uses player fortune, spirit output, and magical energy.</summary>
@@ -321,7 +376,12 @@ public class FortuneFlowController : MonoBehaviour
         WriteTmp(spiritFortuneOutput, "", nameof(FortuneFlowController));
         WriteTmp(judgeOutput, "", nameof(FortuneFlowController));
         _committedMagicalEnergyForDuel = 0;
+        _spiritReadingStartedThisRound = false;
+        _drawCardsAllowed = true;
+        cardPull?.HideCards();
+        spiritReader?.CancelActiveReading();
         ResetMagicalEnergySliderForNewReading();
+        RefreshDrawCardsButtonInteractable();
         RefreshRenderVerdictButtonInteractable();
     }
 
@@ -331,6 +391,13 @@ public class FortuneFlowController : MonoBehaviour
             return;
         gameManager?.RefundMagicalEnergy(_committedMagicalEnergyForDuel);
         _committedMagicalEnergyForDuel = 0;
+    }
+
+    void RefreshDrawCardsButtonInteractable()
+    {
+        if (drawCardsButton == null)
+            return;
+        drawCardsButton.interactable = _drawCardsAllowed;
     }
 
     void RefreshRenderVerdictButtonInteractable()
@@ -413,7 +480,7 @@ public class FortuneFlowController : MonoBehaviour
 
     string GetSpiritTextForScoring()
     {
-        string thinking = outputStrings != null ? (outputStrings.spiritThinkingMessage ?? "").Trim() : "";
+        string thinking = ResolvedSpiritThinkingMessage();
 
         if (spiritFortuneOutput != null)
         {
@@ -466,7 +533,7 @@ public class FortuneFlowOutputStrings
 {
     [Header("Spirit")]
     [TextArea(1, 4)]
-    [Tooltip("Written to Spirit output when Cards view opens, until the model replies.")]
+    [Tooltip("Written to Spirit output while the LLM runs after Read Fortune. If empty, a default line is used.")]
     public string spiritThinkingMessage;
 
     [Header("Judge mirror (optional)")]
@@ -496,11 +563,13 @@ public class FortuneFlowOutputStrings
 
     [Header("Flow log strings (console only)")]
     [TextArea(1, 3)] public string logDrawing;
+    [TextArea(1, 3)] public string logDrawLockedUntilVerdict;
     [TextArea(1, 3)] public string logCardsReady;
     [TextArea(1, 3)] public string logAssignCardPull;
     [TextArea(1, 3)] public string logEnterFortuneFirst;
     [TextArea(1, 3)] public string logAfterReadFortune;
     [TextArea(1, 3)] public string logDrawCardsFirst;
+    [TextArea(1, 3)] public string logReadFortuneBeforeSpirit;
     [TextArea(1, 3)] public string logAssignSpiritReader;
     [TextArea(1, 3)] public string logSpiritRequested;
     [TextArea(1, 3)] public string logJudgeNeedDraw;
