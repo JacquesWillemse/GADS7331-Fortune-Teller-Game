@@ -5725,7 +5725,7 @@ Transform:
   m_GameObject: {fileID: 1215168611}
   serializedVersion: 2
   m_LocalRotation: {x: 0.31119472, y: 0.6349471, z: -0.31119472, w: 0.6349471}
-  m_LocalPosition: {x: 0.13252974, y: -8.80755, z: 3.96526}
+  m_LocalPosition: {x: 0.388, y: -9.136, z: 3.96526}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6316,7 +6316,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1367606036}
   m_LocalRotation: {x: 0, y: 0, z: -0.0037523643, w: 0.99999297}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6324,8 +6324,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -0.43}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -418, y: -102}
-  m_SizeDelta: {x: 600, y: 800}
+  m_AnchoredPosition: {x: -370, y: -35}
+  m_SizeDelta: {x: 700, y: 800}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1367606038
 MonoBehaviour:
@@ -6375,8 +6375,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 25
+  m_fontSizeBase: 25
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -7195,8 +7195,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BookManager
   bookPages: {fileID: 11400000, guid: 80ed2898cc875b047a1e48bbe3c2c1f1, type: 2}
-  leftPage: {fileID: 1367606038}
-  rightPage: {fileID: 2040743708}
+  leftPageTitle: {fileID: 631837705}
+  leftPageBody: {fileID: 1367606038}
+  rightPageTitle: {fileID: 1054932289}
+  rightPageBody: {fileID: 2040743708}
   previousPage: {fileID: 1413726067}
   nextPage: {fileID: 469426707}
 --- !u!1 &1708322961
@@ -8876,8 +8878,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: -0.43}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 389, y: -108}
-  m_SizeDelta: {x: 600, y: 800}
+  m_AnchoredPosition: {x: 390, y: -41}
+  m_SizeDelta: {x: 700, y: 800}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2040743708
 MonoBehaviour:
@@ -8927,8 +8929,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 25
+  m_fontSizeBase: 25
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

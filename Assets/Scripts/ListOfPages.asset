@@ -13,20 +13,160 @@ MonoBehaviour:
   m_Name: ListOfPages
   m_EditorClassIdentifier: Assembly-CSharp::BookPages
   pages:
-  - pageHeading: 1
-    pageWriting: "\u2022\tYou have to identify one of the 4 themes for each card
-      and make a connection between all 3, if 2 themes are repeated you must make
-      a reinforcing connection. \u2022\tYou must state whether it is a morally good,
-      bad or neutral reading \u2022\tIf its good the player has a judge bias, if
-      its bad the spirit does \u2022\tThe player can add a value of 0 to 100 energy
-      to their prediction that will influence the verdict, 100 is an automatic win.
-      \u2022\tThe fortune reading of the spirit and the player must end in a statement
-      referencing the themes and morality, but be twisted in a positive or negative
-      direction respectively "
+  - pageHeading: STORY
+    pageWriting: "(In case you forget, the spirit has a fondness for erasing your
+      memories) You\u2019re a mystic from a long line of carnival fortune tellers,
+      your ancestors struck a deal with a soul hungry spirit, in return you get the
+      power to read fortunes and make wishes come true, the spirit is linked to your
+      bloodline forever and gets the chance to steal your customers souls with their
+      own interpretation, they will try and read the cards negatively in order to
+      kill them, if he succeeds he claims their soul. You are a 10th generation fortune
+      teller and the main attraction of the carnival, known as the Trans Balkan Express.
+      Due to another deal your ancestors made with the \u201COutrageously Wonderful
+      Mr. Zagoo\u201D if you ever run out of customers you will burst into flames."
     pageImage: {fileID: 0}
-  - pageHeading: 2
-    pageWriting: b
+  - pageHeading: 'FORTUNE READING RESOLUTION '
+    pageWriting: "Every fortune reading is a struggle between your silver tongue
+      and the Spirit lurking behind the cards. At the end of a session, both sides
+      gain Favor based on the cards drawn and the words spoken during the reading.
+      Whoever holds the greater Favor claims victory over the customer\u2019s fate."
     pageImage: {fileID: 0}
-  - pageHeading: 3
-    pageWriting: c
+  - pageHeading: 'GAINING FAVOR '
+    pageWriting: "Your Magic Meter is one of the strongest sources of power during
+      a reading. As it fills, it can provide up to +50 Favor. Reaching the maximum
+      instantly secures victory. Good Cards strengthen your reading and each one
+      grants +10 Favor. Neutral cards do not provide Favor on their own, but they
+      can still contribute to other effects. The audience also reacts to the overall
+      energy of the card spread through a mechanic known as Crowd Energy. If the
+      draw contains more Good cards than Bad cards, you gain +15 Favor from the crowd\u2019s
+      approval. If there are more Bad cards than Good cards, those +15 points are
+      instead awarded to the Spirit. Neutral cards are ignored for this comparison,
+      and ties provide no bonus to either side. A special bonus called Hopeful Silence
+      can occur if every drawn card is Neutral. If this happens and your reading
+      contains at least two different Hope Words, you gain an additional +4 Favor.
+      However, the presence of any Good or Bad card immediately cancels this effect.
+      Your reading can also gain strength through Theme Echoes. Each card has its
+      own theme word list, and using words connected to that theme empowers the reading.
+      For every card in order from 1 \u2192 2 \u2192 3, you can gain Favor depending
+      on how many matching theme words are spoken. Using one matching word grants
+      +3 Favor, two matching words grant +5, and three or more matching words grant
+      +8. Across all three cards, the maximum possible gain is +24 Favor. Finally,
+      the overall emotional tone of your reading affects the customer\u2019s belief
+      in your fortune. Hopeful, comforting, or inspiring language increases your
+      Favor, while cruel or overly harsh wording weakens it. Depending on the balance
+      of your wording, the tone system can grant anywhere between 0 and +20 Favor. "
+    pageImage: {fileID: 0}
+  - pageHeading: 
+    pageWriting: "A special bonus called Hopeful Silence can occur if every drawn
+      card is Neutral. If this happens and your reading contains at least two different
+      Hope Words, you gain an additional +4 Favor. However, the presence of any Good
+      or Bad card immediately cancels this effect. Your reading can also gain strength
+      through Theme Echoes. Each card has its own theme word list, and using words
+      connected to that theme empowers the reading. For every card in order from
+      1 \u2192 2 \u2192 3, you can gain Favor depending on how many matching theme
+      words are spoken. Using one matching word grants +3 Favor, two matching words
+      grant +5, and three or more matching words grant +8. Across all three cards,
+      the maximum possible gain is +24 Favor. Finally, the overall emotional tone
+      of your reading affects the customer\u2019s belief in your fortune. Hopeful,
+      comforting, or inspiring language increases your Favor, while cruel or overly
+      harsh wording weakens it. Depending on the balance of your wording, the tone
+      system can grant anywhere between 0 and +20 Favor. "
+    pageImage: {fileID: 0}
+  - pageHeading: "THE SPIRIT\u2019S FAVOR "
+    pageWriting: 'The Spirit gains power through darkness and misfortune. Every Bad
+      Card drawn grants the Spirit +10 Favor, while Neutral cards provide nothing.
+      The Spirit also benefits from its own version of Theme Echoes and Tone Matching.
+      Unlike your readings, however, the Spirit grows stronger from words tied to
+      fear, despair, misery, and cruelty. Soft or hopeful language weakens the curse,
+      while dreadful and threatening wording empowers it further. '
+    pageImage: {fileID: 0}
+  - pageHeading: 'CARD MORALS '
+    pageWriting: 'Every card in the deck carries a hidden moral alignment that influences
+      the balance of Favor during a reading. Understanding the nature of each card
+      is essential if you hope to outwit the Spirit. Good Cards grant +10 Favor to
+      you whenever they appear in the spread. These cards represent fortunate omens,
+      hopeful futures, and uplifting energies. Bad Cards instead empower the Spirit,
+      granting it +10 Favor for each one drawn. These cards feed fear, despair, and
+      corruption into the reading. Neutral Cards do not directly grant Favor to either
+      side. However, they can still activate special effects such as Hopeful Silence
+      and influence systems like Crowd Energy depending on the overall draw. '
+    pageImage: {fileID: 0}
+  - pageHeading: 'THEME VOCABULARY '
+    pageWriting: "Each card belongs to a mystical theme. During the reading, words
+      connected to that card\u2019s theme can trigger powerful Theme Echo bonuses.
+      Theme matching is checked from left to right across the spread, meaning Card
+      1 uses its own theme list, Card 2 uses its own list, and so on. The Greed theme
+      contains words tied to excess, wealth, and endless appetite. Words such as
+      greed, hunger, feast, glutton, gold, coin, wealth, covet, and banquet all resonate
+      with Greed-aligned cards. The Vanity theme revolves around pride, appearance,
+      and self-image. Words like mirror, pride, ego, beauty, reflection, mask, and
+      vain contribute toward Vanity echoes. The Chaos theme embraces destruction
+      and instability. Terms such as storm, disorder, spiral, mayhem, wreck, shatter,
+      and wild strengthen Chaos cards. The Power theme represents authority, domination,
+      and burden. Words including control, throne, crown, rule, dominion, command,
+      reign, and burden all resonate with Power-aligned cards. Efficient readings
+      usually aim for around two matching words per card, as additional matches provide
+      diminishing rewards. Only words belonging to the active card\u2019s theme count
+      toward that card\u2019s score. For example, using Vanity words on a Chaos card
+      grants no bonus at all. "
+    pageImage: {fileID: 0}
+  - pageHeading: 'TONE OF THE READING '
+    pageWriting: "The emotional language used during a fortune is just as important
+      as the cards themselves. Both you and the Spirit gain Favor based on the overall
+      tone of your words. Your readings gain power from Hope Words and lose strength
+      from Harsh Words. The system calculates your Tone score by heavily rewarding
+      hopeful language while penalizing cruel or fearful wording. Final Tone Favor
+      is always limited to a range between 0 and 20. The Spirit follows the opposite
+      rule. Harsh, dreadful, and threatening language strengthens its curse, while
+      hopeful wording weakens it. Its Tone score is also capped between 0 and 20.
+      Words only count once per reading, regardless of how many times they are repeated.
+      Capital letters are ignored, and special phrases such as \u201Cwalk lightly\u201D
+      or \u201Chunger for\u201D only count if written exactly as shown. Hopeful language
+      includes words tied to healing, guidance, growth, and comfort. Examples include
+      hope, peace, heal, blessing, courage, balance, support, warmth, forgive, and
+      renew. Harsh language includes words associated with suffering and decay. Examples
+      include ruin, doom, curse, rot, dread, hollow, death, darkness, shatter, and
+      corruption. A skilled fortune teller learns to lean heavily into hopeful language
+      while avoiding harsh phrasing whenever possible \u2014 even when describing
+      dark or dangerous themes. "
+    pageImage: {fileID: 0}
+  - pageHeading: 'THE MAGIC METER '
+    pageWriting: "Every fortune teller\u2019s tent is powered by a mystical Magic
+      Meter. Some tents use a short dial while others use a much longer one, but
+      the rule is always the same: reaching FULL means absolute dominance over the
+      reading. As the meter fills, it grants increasing amounts of Favor, scaling
+      up to a maximum of +50 Favor before completion. However, the moment the meter
+      reaches FULL, the duel ends instantly in your favor. The Spirit\u2019s curse
+      is silenced completely, regardless of its score or wording. A wise teller keeps
+      one eye on the cards\u2026 and the other on the meter. "
+    pageImage: {fileID: 0}
+  - pageHeading: 'QUICK START GUIDE '
+    pageWriting: "Before submitting a fortune, quickly examine the flow of the reading.
+      First, check the morals of the drawn cards. A spread filled with Good Cards
+      gives you natural momentum, while too many Bad Cards strengthen the Spirit.
+      If every card is Neutral, then the outcome depends almost entirely on your
+      wording, making Hope Words especially important for securing the Hopeful Silence
+      bonus. Next, glance at the Magic Meter. If it has reached FULL, the reading
+      is already won and no further strategy is needed. After that, focus on building
+      Theme Echoes. Try to match words to each card\u2019s theme in the exact order
+      the cards were drawn. Consistent theme matching is one of the strongest ways
+      to build Favor quickly. Finally, control the emotional tone of your reading.
+      Fill your fortune with hopeful, comforting language while avoiding harsh or
+      dreadful wording. Winning the tone battle often decides close matches against
+      the Spirit. "
+    pageImage: {fileID: 0}
+  - pageHeading: 'FAVOR REFERENCE '
+    pageWriting: 'In a standard three-card duel, Favor can be earned from several
+      different sources throughout the reading. The Magic Meter can provide up to
+      +50 Favor, unless it reaches FULL, in which case it grants an immediate victory
+      instead. Good Cards can provide up to +30 Favor for you across the spread,
+      while Bad Cards can grant up to +30 Favor to the Spirit. The Crowd Energy bonus
+      can award +15 Favor to either side depending on whether Good or Bad cards dominate
+      the draw. The special Hopeful Silence bonus grants an additional +4 Favor if
+      every card is Neutral and enough Hope Words are used. Through careful word
+      choice, Theme Echoes can contribute up to +24 Favor for either side. Finally,
+      the emotional Tone system can grant as much as +20 Favor depending on how hopeful
+      or dreadful the reading becomes. No matter how the numbers are calculated,
+      remember one final rule above all others: If the Magic Meter reaches FULL,
+      the fortune teller always wins. '
     pageImage: {fileID: 0}

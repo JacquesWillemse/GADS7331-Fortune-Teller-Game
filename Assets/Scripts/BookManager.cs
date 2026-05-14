@@ -6,8 +6,11 @@ using UnityEngine.UI;
 public class BookManager : MonoBehaviour
 {
     [SerializeField] private BookPages bookPages;
-    [SerializeField] private TMP_Text leftPage;
-    [SerializeField] private TMP_Text rightPage;
+
+    [SerializeField] private TMP_Text leftPageTitle;
+    [SerializeField] private TMP_Text leftPageBody;
+    [SerializeField] private TMP_Text rightPageTitle;
+    [SerializeField] private TMP_Text rightPageBody;
 
     [SerializeField] private Button previousPage;
     [SerializeField] private Button nextPage;
@@ -56,34 +59,44 @@ public class BookManager : MonoBehaviour
     void RefreshView()
     {
         List<PageData> list = bookPages != null ? bookPages.pages : null;
-        ApplyPage(leftPage, list, _spreadStartIndex);
-        ApplyPage(rightPage, list, _spreadStartIndex + 1);
+        ApplyPage(leftPageTitle, leftPageBody, list, _spreadStartIndex);
+        ApplyPage(rightPageTitle, rightPageBody, list, _spreadStartIndex + 1);
         UpdateNavButtons(list);
     }
 
-    static void ApplyPage(TMP_Text tmp, List<PageData> list, int index)
+    static void ApplyPage(TMP_Text titleTmp, TMP_Text bodyTmp, List<PageData> list, int index)
     {
-        if (tmp == null)
-            return;
         if (list == null || index < 0 || index >= list.Count)
         {
-            tmp.text = "";
+            ClearTmp(titleTmp);
+            ClearTmp(bodyTmp);
             return;
         }
 
         PageData page = list[index];
         if (page == null)
         {
-            tmp.text = "";
+            ClearTmp(titleTmp);
+            ClearTmp(bodyTmp);
             return;
         }
 
-        if (string.IsNullOrEmpty(page.pageHeading))
-            tmp.text = page.pageWriting ?? "";
-        else if (string.IsNullOrEmpty(page.pageWriting))
-            tmp.text = page.pageHeading;
-        else
-            tmp.text = page.pageHeading + "\n\n" + page.pageWriting;
+        SetTmp(titleTmp, page.pageHeading);
+        SetTmp(bodyTmp, page.pageWriting);
+    }
+
+    static void SetTmp(TMP_Text tmp, string value)
+    {
+        if (tmp == null)
+            return;
+        tmp.text = value ?? "";
+    }
+
+    static void ClearTmp(TMP_Text tmp)
+    {
+        if (tmp == null)
+            return;
+        tmp.text = "";
     }
 
     void UpdateNavButtons(List<PageData> list)
