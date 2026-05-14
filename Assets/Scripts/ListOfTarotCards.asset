@@ -32,7 +32,7 @@ MonoBehaviour:
   - cardName: 'Waxing a grizzly bear '
     cardTheme: Vanity
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 8a3e71630ede7ce4dacaf05dbb049ae1, type: 3}
   - cardName: 20 Succulent Chinese meals for 1
     cardTheme: Greed
     cardMoral: 1
