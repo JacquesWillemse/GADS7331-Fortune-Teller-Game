@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ListOfPages
   m_EditorClassIdentifier: Assembly-CSharp::BookPages
   pages:
-  - pageHeading: 
+  - pageHeading: 1
     pageWriting: "\u2022\tYou have to identify one of the 4 themes for each card
       and make a connection between all 3, if 2 themes are repeated you must make
       a reinforcing connection. \u2022\tYou must state whether it is a morally good,
@@ -23,4 +23,10 @@ MonoBehaviour:
       \u2022\tThe fortune reading of the spirit and the player must end in a statement
       referencing the themes and morality, but be twisted in a positive or negative
       direction respectively "
+    pageImage: {fileID: 0}
+  - pageHeading: 2
+    pageWriting: b
+    pageImage: {fileID: 0}
+  - pageHeading: 3
+    pageWriting: c
     pageImage: {fileID: 0}

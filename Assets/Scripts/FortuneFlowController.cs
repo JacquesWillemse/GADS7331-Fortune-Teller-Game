@@ -34,6 +34,8 @@ public class FortuneFlowController : MonoBehaviour
     [SerializeField] private Button renderVerdictButton;
     [Tooltip("Pull Cards — disabled after a spread is drawn until Accept Verdict resets the round.")]
     [SerializeField] private Button drawCardsButton;
+    [Tooltip("Accept Verdict — enabled only after Make Judgement has run for this round (until accepted or reset).")]
+    [SerializeField] private Button acceptJudgementButton;
 
     [Header("Player reading coach")]
     [Tooltip("If set, assigned to the TMP_InputField placeholder so players know to close with themes + moral lean twisted toward hope.")]
@@ -402,19 +404,28 @@ public class FortuneFlowController : MonoBehaviour
 
     void RefreshRenderVerdictButtonInteractable()
     {
-        if (renderVerdictButton == null)
-            return;
-
-        if (_verdictAwaitingAccept)
+        if (renderVerdictButton != null)
         {
-            renderVerdictButton.interactable = false;
-            return;
+            if (_verdictAwaitingAccept)
+                renderVerdictButton.interactable = false;
+            else
+            {
+                bool ready = _cardsDrawn
+                    && !string.IsNullOrEmpty(_playerFortuneForJudge)
+                    && !string.IsNullOrEmpty(GetSpiritTextForScoring());
+                renderVerdictButton.interactable = ready;
+            }
         }
 
-        bool ready = _cardsDrawn
-            && !string.IsNullOrEmpty(_playerFortuneForJudge)
-            && !string.IsNullOrEmpty(GetSpiritTextForScoring());
-        renderVerdictButton.interactable = ready;
+        RefreshAcceptJudgementButtonInteractable();
+    }
+
+    void RefreshAcceptJudgementButtonInteractable()
+    {
+        if (acceptJudgementButton == null)
+            return;
+        bool canAccept = _verdictAwaitingAccept && (gameManager == null || !gameManager.GameComplete);
+        acceptJudgementButton.interactable = canAccept;
     }
 
     string BuildJudgeVerdictBlock(string player, string spiritBody, string winnerLabel, string explanation, bool playerWon)

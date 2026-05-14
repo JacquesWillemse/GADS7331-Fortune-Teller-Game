@@ -10,6 +10,7 @@ public class CameraManager : MonoBehaviour
 
     [SerializeField] private UIManager uiManager;
     [SerializeField] private Canvas panelBook;
+    [SerializeField] private GameObject panelBookMain;
     [SerializeField] private Canvas panelMain;
     [SerializeField] private Canvas panelJudge;
     [SerializeField] private GameObject panelUIJudge;
@@ -28,6 +29,7 @@ public class CameraManager : MonoBehaviour
         judgeCamera.gameObject.SetActive(false);
         uiManager.HideCardPanel();
         panelBook.gameObject.SetActive(false);
+        panelBookMain.gameObject.SetActive(false);
         panelJudge.gameObject.SetActive(false);
         panelUIJudge.SetActive(false);
     }
@@ -44,6 +46,7 @@ public class CameraManager : MonoBehaviour
         DisableAllCameras();
         bookCamera.gameObject.SetActive(true);
         panelBook.gameObject.SetActive(true);
+        panelBookMain.gameObject.SetActive(true);
     }
 
     public void ActivateCardCamera()
