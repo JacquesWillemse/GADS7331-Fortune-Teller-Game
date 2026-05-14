@@ -38,6 +38,12 @@ public class TarotCardPull : MonoBehaviour
     {
         
     }
+    /// <summary>Clears duplicate-avoidance list so a new tent session can draw again.</summary>
+    public void ClearPullHistory()
+    {
+        cardPulls.Clear();
+    }
+
     public void CardPull()
     {
         StartCoroutine(CardPullCoroutine());
@@ -52,7 +58,7 @@ public class TarotCardPull : MonoBehaviour
             card = tarotDatabase.cards[RandomCard()];
 
             cardDescriptions[i].text = card.cardName;
-            cardImages[i] = card.tarotCardImage;
+            cardImages[i].sprite = card.tarotCardImage;
             cardMorality[i] = card.cardMoral;
 
             CardHolders[i].SetActive(true);

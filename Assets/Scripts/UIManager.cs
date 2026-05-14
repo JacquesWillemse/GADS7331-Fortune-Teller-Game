@@ -5,6 +5,7 @@ public class UIManager : MonoBehaviour
 {
     [SerializeField] private CameraManager cameraManager;
     [SerializeField] private FortuneFlowController fortuneFlow;
+    [SerializeField] private GameManager gameManager;
 
     [SerializeField] private Button drawCardsBtn;
     [SerializeField] private Button readFortuneBtn;
@@ -13,6 +14,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button wisdonBookBtn;
     [SerializeField] private Button spiritBtn;
     [SerializeField] private Button judgeBtn;
+    [Tooltip("Runs scoring and fills judge text (e.g. spirit / judge screen).")]
+    [SerializeField] private Button renderJudgementBtn;
+    [Tooltip("Applies energy & customers and clears the tent for the next customer.")]
+    [SerializeField] private Button acceptJudgementBtn;
 
     [SerializeField] private GameObject cardUI;
 
@@ -32,6 +37,10 @@ public class UIManager : MonoBehaviour
             spiritBtn.onClick.AddListener(SpiritPressed);
         if (judgeBtn != null)
             judgeBtn.onClick.AddListener(JudgePressed);
+        if (renderJudgementBtn != null)
+            renderJudgementBtn.onClick.AddListener(RenderJudgementPressed);
+        if (acceptJudgementBtn != null)
+            acceptJudgementBtn.onClick.AddListener(AcceptJudgementPressed);
     }
 
     void DrawCardsPressed()
@@ -71,6 +80,16 @@ public class UIManager : MonoBehaviour
     void JudgePressed()
     {
         cameraManager?.ActivateJudgeCamera();
+    }
+
+    void RenderJudgementPressed()
+    {
+        fortuneFlow?.RenderVerdict();
+    }
+
+    void AcceptJudgementPressed()
+    {
+        gameManager?.AcceptJudgement();
     }
 
     public void HideCardPanel()

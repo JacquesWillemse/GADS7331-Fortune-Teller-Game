@@ -12,6 +12,7 @@ public class CameraManager : MonoBehaviour
     [SerializeField] private Canvas panelBook;
     [SerializeField] private Canvas panelMain;
     [SerializeField] private Canvas panelJudge;
+    [SerializeField] private GameObject panelUIJudge;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -28,6 +29,7 @@ public class CameraManager : MonoBehaviour
         uiManager.HideCardPanel();
         panelBook.gameObject.SetActive(false);
         panelJudge.gameObject.SetActive(false);
+        panelUIJudge.SetActive(false);
     }
 
     public void ActivateTentCamera()
@@ -62,5 +64,6 @@ public class CameraManager : MonoBehaviour
         DisableAllCameras();
         judgeCamera.gameObject.SetActive(true);
         panelJudge.gameObject.SetActive(true);
+        panelUIJudge.SetActive(true);
     }
 }

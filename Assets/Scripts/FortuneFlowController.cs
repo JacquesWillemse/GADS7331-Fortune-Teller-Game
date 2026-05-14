@@ -6,7 +6,8 @@ using TMPro;
 
 /// <summary>
 /// Tent flow: draw 3 cards → read fortune (player text UI, no score) → open Cards view to summon spirit prediction →
-/// open Judge view and press <see cref="RenderVerdict"/> when ready. Magical energy 0–100 on the slider; at 100 the player always wins.
+/// open Judge view and press <see cref="RenderVerdict"/> when ready.
+/// Magical energy for the duel is chosen on the judge slider, then committed (subtracted from global run energy) when the player presses Read Fortune; <see cref="RenderVerdict"/> uses that committed amount.
 /// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy). Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
 /// </summary>
 public class FortuneFlowController : MonoBehaviour
@@ -20,9 +21,17 @@ public class FortuneFlowController : MonoBehaviour
     public TMP_Text judgeOutput;
 
     [SerializeField] private TarotCardPull cardPull;
+    [Tooltip("Optional — keeps GameManager.CardsDrawn in sync and receives round reset after Accept Verdict.")]
+    [SerializeField] private GameManager gameManager;
     [SerializeField] private DemonTarotReader spiritReader;
     [SerializeField] private TMP_InputField playerFortuneInput;
     [SerializeField] private Slider magicalEnergySlider;
+    [Tooltip("Shows the duel magical energy slider value (0–100). Optional.")]
+    [SerializeField] private TMP_Text magicalEnergyValueText;
+
+    [Header("Judge UI gate")]
+    [Tooltip("Assign the same button that calls RenderVerdict (e.g. Make Judgement). Kept disabled until cards are drawn, fortune read, and spirit reply is present — blocks stray Submit / double wiring.")]
+    [SerializeField] private Button renderVerdictButton;
 
     [Header("Player reading coach")]
     [Tooltip("If set, assigned to the TMP_InputField placeholder so players know to close with themes + moral lean twisted toward hope.")]
@@ -42,12 +51,32 @@ public class FortuneFlowController : MonoBehaviour
     readonly List<TarotCardData> _spread = new List<TarotCardData>();
     string _playerFortuneForJudge = "";
     bool _cardsDrawn;
+    bool _verdictAwaitingAccept;
+    bool _lastPlayerWon;
+    int _lastScoreMargin;
+    bool _lastGuaranteedWin;
+
+    /// <summary>Magical energy committed when the player pressed Read Fortune (deducted from global); used for <see cref="RenderVerdict"/> scoring.</summary>
+    int _committedMagicalEnergyForDuel;
 
     public bool CardsDrawn => _cardsDrawn;
+
+    /// <summary>True after a successful <see cref="RenderVerdict"/> until <see cref="ResetRoundAfterVerdictAccepted"/> or a new draw.</summary>
+    public bool VerdictAwaitingAccept => _verdictAwaitingAccept;
+
+    /// <summary>Margin = player total − spirit total (positive means teller ahead).</summary>
+    public bool TryGetLastVerdict(out bool playerWon, out int scoreMargin, out bool guaranteedWin)
+    {
+        playerWon = _lastPlayerWon;
+        scoreMargin = _lastScoreMargin;
+        guaranteedWin = _lastGuaranteedWin;
+        return _verdictAwaitingAccept;
+    }
 
     void Start()
     {
         ApplyPlayerFortunePlaceholderHint();
+        RefreshRenderVerdictButtonInteractable();
     }
 
     void Awake()
@@ -60,6 +89,8 @@ public class FortuneFlowController : MonoBehaviour
             magicalEnergySlider.minValue = 0f;
             magicalEnergySlider.maxValue = 100f;
             magicalEnergySlider.wholeNumbers = true;
+            magicalEnergySlider.onValueChanged.AddListener(OnMagicalEnergySliderChanged);
+            ResetMagicalEnergySliderForNewReading();
         }
 
         // Subscribe here (not OnEnable): if this object lives under the tent UI, switching to the card
@@ -76,25 +107,32 @@ public class FortuneFlowController : MonoBehaviour
             cardPull.onCardPullComplete.RemoveListener(OnCardPullComplete);
         if (spiritReader != null)
             spiritReader.onResponseText.RemoveListener(OnSpiritResponseText);
+        if (magicalEnergySlider != null)
+            magicalEnergySlider.onValueChanged.RemoveListener(OnMagicalEnergySliderChanged);
     }
 
     void OnSpiritResponseText(string text)
     {
         WriteTmp(spiritFortuneOutput, text, nameof(FortuneFlowController));
-        if (judgeOutput == null || outputStrings == null || string.IsNullOrEmpty(outputStrings.judgeMirrorSpiritOnResponseFormat))
-            return;
-        string addition = SafeFormat(outputStrings.judgeMirrorSpiritOnResponseFormat, text);
-        string existing = judgeOutput.text ?? "";
-        if (string.IsNullOrEmpty(existing))
-            WriteTmp(judgeOutput, addition, nameof(FortuneFlowController));
-        else
-            WriteTmp(judgeOutput, existing + "\n\n" + addition, nameof(FortuneFlowController));
+        if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorSpiritOnResponseFormat))
+        {
+            string addition = SafeFormat(outputStrings.judgeMirrorSpiritOnResponseFormat, text);
+            string existing = judgeOutput.text ?? "";
+            if (string.IsNullOrEmpty(existing))
+                WriteTmp(judgeOutput, addition, nameof(FortuneFlowController));
+            else
+                WriteTmp(judgeOutput, existing + "\n\n" + addition, nameof(FortuneFlowController));
+        }
+
+        RefreshRenderVerdictButtonInteractable();
     }
 
     void OnCardPullComplete()
     {
         _cardsDrawn = true;
+        gameManager?.SetCardsDrawn(true);
         LogFlow(outputStrings != null ? outputStrings.logCardsReady : null);
+        RefreshRenderVerdictButtonInteractable();
     }
 
     /// <summary>Wired to Draw Cards button.</summary>
@@ -106,13 +144,18 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
+        RefundCommittedMagicalEnergyIfAny();
         _cardsDrawn = false;
+        _verdictAwaitingAccept = false;
         _playerFortuneForJudge = "";
+        gameManager?.SetCardsDrawn(false);
         WriteTmp(playerFortuneOutput, "", nameof(FortuneFlowController));
         WriteTmp(spiritFortuneOutput, "", nameof(FortuneFlowController));
         WriteTmp(judgeOutput, "", nameof(FortuneFlowController));
+        cardPull.ClearPullHistory();
         cardPull.CardPull();
         LogFlow(outputStrings != null ? outputStrings.logDrawing : null);
+        RefreshRenderVerdictButtonInteractable();
     }
 
     /// <summary>Wired to Read Fortune — fills the player output (and optionally the judge mirror). No verdict.</summary>
@@ -125,11 +168,22 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
+        // Slider chooses how much global energy to commit for this reading; charged now so HUD updates immediately.
+        RefundCommittedMagicalEnergyIfAny();
+        int request = magicalEnergySlider != null ? Mathf.RoundToInt(magicalEnergySlider.value) : 0;
+        request = Mathf.Clamp(request, 0, 100);
+        if (gameManager != null && request > 0)
+            _committedMagicalEnergyForDuel = gameManager.TrySpendMagicalEnergy(request);
+        else
+            _committedMagicalEnergyForDuel = 0;
+        ResetMagicalEnergySliderForNewReading();
+
         _playerFortuneForJudge = t;
         WriteTmp(playerFortuneOutput, t, nameof(FortuneFlowController));
         if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorPlayerOnReadFormat))
             WriteTmp(judgeOutput, SafeFormat(outputStrings.judgeMirrorPlayerOnReadFormat, t), nameof(FortuneFlowController));
         LogFlow(outputStrings != null ? outputStrings.logAfterReadFortune : null);
+        RefreshRenderVerdictButtonInteractable();
     }
 
     /// <summary>Call when the Cards navigation opens (after <see cref="CameraManager.ActivateCardCamera"/>).</summary>
@@ -151,11 +205,24 @@ public class FortuneFlowController : MonoBehaviour
             WriteTmp(spiritFortuneOutput, outputStrings.spiritThinkingMessage ?? "", nameof(FortuneFlowController));
         spiritReader.RequestFromPull(skipInitialOutput: true);
         LogFlow(outputStrings != null ? outputStrings.logSpiritRequested : null);
+        RefreshRenderVerdictButtonInteractable();
     }
 
     /// <summary>Wired to a button on the Judge panel (e.g. "Render Verdict"). Uses player fortune, spirit output, and magical energy.</summary>
     public void RenderVerdict()
     {
+        if (renderVerdictButton != null && !renderVerdictButton.interactable)
+        {
+            LogFlow("Make Judgement is not available yet — finish the spirit reading first.");
+            return;
+        }
+
+        if (_verdictAwaitingAccept)
+        {
+            LogFlow("Verdict already shown — accept it before rendering again.");
+            return;
+        }
+
         if (!_cardsDrawn)
         {
             LogFlow(outputStrings != null ? outputStrings.logJudgeNeedDraw : null);
@@ -181,8 +248,7 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
-        float energy = magicalEnergySlider != null ? magicalEnergySlider.value : 0f;
-        energy = Mathf.Clamp(energy, 0f, 100f);
+        float energy = Mathf.Clamp(_committedMagicalEnergyForDuel, 0f, 100f);
 
         FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(_spread, _playerFortuneForJudge, spirit, energy);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energy);
@@ -195,6 +261,11 @@ public class FortuneFlowController : MonoBehaviour
             playerWon = false;
         else
             playerWon = tieRoundGoesToPlayer;
+
+        _lastScoreMargin = duel.PlayerTotal - duel.DemonTotal;
+        _lastPlayerWon = playerWon;
+        _lastGuaranteedWin = guaranteed;
+        _verdictAwaitingAccept = true;
 
         string explanation = FortuneDuelRubric.BuildVerdictExplanationOneSentence(duel, playerWon, guaranteed, tieRoundGoesToPlayer);
         string rationale = FortuneDuelRubric.FormatRationale(duel, playerWon, energy, guaranteed);
@@ -209,6 +280,74 @@ public class FortuneFlowController : MonoBehaviour
         LogFlow(outputStrings != null ? outputStrings.logVerdictRendered : null);
         onVerdictComplete?.Invoke(playerWon, explanation);
         Debug.Log($"[Fortune][Judge] winner={(playerWon ? "Player" : "Spirit")} | {explanation}\n{rationale}");
+        RefreshRenderVerdictButtonInteractable();
+    }
+
+    /// <summary>Optional: force the duel slider from run meta-energy. Normally unused — the duel slider is player-set each reading.</summary>
+    public void ApplyGameEnergyToDuelSlider(int energy0to100)
+    {
+        if (magicalEnergySlider != null)
+            magicalEnergySlider.value = Mathf.Clamp(energy0to100, 0f, 100f);
+    }
+
+    void OnMagicalEnergySliderChanged(float _) => RefreshMagicalEnergyValueText();
+
+    void RefreshMagicalEnergyValueText()
+    {
+        if (magicalEnergyValueText == null || magicalEnergySlider == null)
+            return;
+        magicalEnergyValueText.text = Mathf.RoundToInt(magicalEnergySlider.value).ToString();
+    }
+
+    /// <summary>0–100 duel commitment; call after each accepted verdict and on load.</summary>
+    public void ResetMagicalEnergySliderForNewReading()
+    {
+        if (magicalEnergySlider == null)
+            return;
+        magicalEnergySlider.value = 0f;
+        RefreshMagicalEnergyValueText();
+    }
+
+    /// <summary>Clears flow state for the next customer after resources are applied on Accept Verdict.</summary>
+    public void ResetRoundAfterVerdictAccepted()
+    {
+        _verdictAwaitingAccept = false;
+        _cardsDrawn = false;
+        _playerFortuneForJudge = "";
+        gameManager?.SetCardsDrawn(false);
+        if (playerFortuneInput != null)
+            playerFortuneInput.text = "";
+        WriteTmp(playerFortuneOutput, "", nameof(FortuneFlowController));
+        WriteTmp(spiritFortuneOutput, "", nameof(FortuneFlowController));
+        WriteTmp(judgeOutput, "", nameof(FortuneFlowController));
+        _committedMagicalEnergyForDuel = 0;
+        ResetMagicalEnergySliderForNewReading();
+        RefreshRenderVerdictButtonInteractable();
+    }
+
+    void RefundCommittedMagicalEnergyIfAny()
+    {
+        if (_committedMagicalEnergyForDuel <= 0)
+            return;
+        gameManager?.RefundMagicalEnergy(_committedMagicalEnergyForDuel);
+        _committedMagicalEnergyForDuel = 0;
+    }
+
+    void RefreshRenderVerdictButtonInteractable()
+    {
+        if (renderVerdictButton == null)
+            return;
+
+        if (_verdictAwaitingAccept)
+        {
+            renderVerdictButton.interactable = false;
+            return;
+        }
+
+        bool ready = _cardsDrawn
+            && !string.IsNullOrEmpty(_playerFortuneForJudge)
+            && !string.IsNullOrEmpty(GetSpiritTextForScoring());
+        renderVerdictButton.interactable = ready;
     }
 
     string BuildJudgeVerdictBlock(string player, string spiritBody, string winnerLabel, string explanation, bool playerWon)

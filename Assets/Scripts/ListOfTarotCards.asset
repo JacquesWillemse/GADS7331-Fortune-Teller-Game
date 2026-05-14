@@ -16,7 +16,7 @@ MonoBehaviour:
   - cardName: 'Rat jumping into a deep-fry for a piece of cheese '
     cardTheme: Greed
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: abe7d91be3a655b4f9e8a40d8d34103e, type: 3}
   - cardName: Woman with an unsustainable head to mohawk ratio
     cardTheme: Vanity
     cardMoral: 1
