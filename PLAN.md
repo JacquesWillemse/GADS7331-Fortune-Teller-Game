@@ -9,12 +9,12 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
 - Demon dance battle mini-game
 
 ## Current State (May 2026)
-- Unity scene has a working test hookup for drawing and showing 3 cards.
-- Tarot card ScriptableObject data exists and includes hidden themes.
-- Card count is intentionally hardcoded to 3 for UI testing.
-- **Ollama:** `OllamaClient` (`/api/generate`), `TarotReadingSmokeTest` (positive harness), `DemonTarotReader` (demon harness), shared prompts in `DemonTarotPrompts` / `TarotJudgePrompts`.
-- **Duel prototype:** `TarotReadingDuelPipeline` — optional demon gate (JSON) → demon reading → judge path and/or deterministic duel scoring (see scripts; judge LLM wiring as configured in scene).
-- **Demon reading quality:** optional **two-pass** flow (`DemonTarotTwoPass`, `DemonReadingOutline` + parser): JSON outline then prose curse; Inspector toggles on `DemonTarotReader` and `TarotReadingDuelPipeline`; parse failure falls back to single-pass demon prompt.
+- **Scenes:** `MainMenu` → `MainScene`; production flow on `FortuneFlowController`.
+- Tarot card ScriptableObject data with hidden themes and morals; 3-card draw for UI prototype.
+- **Spirit:** starts on **draw complete** via `DemonTarotReader` + optional `DemonTarotTwoPass` (outline → prose).
+- **Player fortune:** typed in UI on Read Fortune; magical energy committed from slider.
+- **Judge:** `FortuneDuelRubric` (instant) + optional `JudgeVerdictProsePrompts` (Ollama prose + winner line).
+- **Dev harnesses:** `TarotReadingSmokeTest`, `TarotReadingDuelPipeline` (gate + spirit + rubric experiments).
 
 ## Gameplay Loop (Target)
 1. Customer enters tent
@@ -108,3 +108,18 @@ Build a Unity narrative strategy game where the player gives a positive tarot re
   - Mitigation: async requests + loading states + response timeout.
 - Risk: narrative tone drift.
   - Mitigation: system prompt constraints and role conditioning per agent.
+
+## Repository documentation
+
+| File | Purpose |
+|------|---------|
+| `HIGH_CONCEPT.md` | Ideation, LLM role, why local Ollama |
+| `ollama-plan.md` | Model, inference timing, data flow, prompts, risks |
+| `setup.md` | Unity + Ollama install, scenes, troubleshooting |
+| `refinements-changes.md` | Scope changes and decision log |
+| `README.md` | Overview, dependencies, credits, AI tools |
+| `PLAN.md` | This roadmap |
+| `RUNNING_LOG.md` | Session engineering notes |
+| `requirements.txt` | Requirements baseline |
+| `PLAYER_DUEL_SCORING_GUIDE.md` | Player-facing scoring |
+| `prompts-used.md` | Prompt archive (tested prompts, iterations) |

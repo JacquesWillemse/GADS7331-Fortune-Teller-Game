@@ -1,6 +1,14 @@
-# LLM prompts — spirit (demon) and judge
+# prompts-used.md — Prompt archive
 
-This document lists **spirit** (demon counter-reading + gate) and **judge** prompts used in the Fortune Teller project. Earlier versions are reconstructed from `RUNNING_LOG.md` and design notes; **verbatim text for superseded prompts was not kept in the repo**—only what failed about each iteration is recorded below.
+Course **Prompt Archive** requirements:
+
+| Requirement | Where in this file |
+|-------------|-------------------|
+| **All tested prompts** | [Index of every prompt tested](#index-of-every-prompt-tested) + [Latest prompts (verbatim)](#latest-prompts-verbatim-core--spirit) |
+| **Successful and failed examples** | [Representative success and failure outputs](#representative-success-and-failure-outputs) |
+| **Iteration notes and reasoning** | Per-family sections below (spirit v1–v7, gate v1–v3, JSON judge v1–v3, verdict prose v1–v2) |
+
+Earlier spirit/gate/judge versions are reconstructed from `RUNNING_LOG.md` and design notes. **Verbatim text for superseded iterations was not kept in the repo**—failures are described by symptom; **latest** prompts are copied from source below.
 
 **Production today (`FortuneFlowController` / `MainScene`):**
 
@@ -8,12 +16,72 @@ This document lists **spirit** (demon counter-reading + gate) and **judge** prom
 |------|------|--------|
 | Player fortune | No (player types in UI) | — |
 | Spirit curse | **Yes** | `DemonTarotPrompts` via `DemonTarotReader` (optional two-pass in `DemonTarotTwoPass`) |
-| Verdict / “judge” | **No** (rule-based) | `FortuneDuelRubric.Compute` — not `TarotJudgePrompts` |
-| Demon gate (skip counter-read if player already cruel) | Optional | `DemonTarotPrompts.BuildGatePrompt` — used in `TarotReadingDuelPipeline` when `enableDemonGate` is on; **not** in main tent flow by default |
+| Verdict scoring | **No** (rule-based) | `FortuneDuelRubric.Compute` |
+| Verdict announcement | **Yes** (optional) | `JudgeVerdictProsePrompts.BuildProsePrompt` when `useLlmJudgeProse` is on |
+| Demon gate (skip counter-read if player already cruel) | Optional | `DemonTarotPrompts.BuildGatePrompt` — `TarotReadingDuelPipeline` when `enableDemonGate` is on; **not** main tent flow by default |
 
-Legacy dev harness: `TarotReadingDuelPipeline` can still run gate → demon → **LLM judge** or **rubric** scoring depending on Inspector setup.
+Legacy dev harness: `TarotReadingDuelPipeline` can still run gate → spirit → **LLM JSON judge** (`TarotJudgePrompts`) or rubric-only, depending on Inspector setup.
 
 Dynamic blocks appended to spirit prompts at runtime: **spread private lines** (`TarotLlmSpreadContext`), **NAMED THEMES** contract, **WORD BUDGET**, **CHECKLIST**, **LEXICAL POOLS**, optional **DESIGNER EXTRA RULES** from Inspector.
+
+---
+
+## Index of every prompt tested
+
+| ID | Prompt | Tested in | Production? | Source |
+|----|--------|-----------|---------------|--------|
+| S1–S7 | Spirit reading (single-pass evolution → two-pass) | Main scene + harness | **S7** (two-pass + S6 fallback) | `DemonTarotPrompts` |
+| G1–G3 | Spirit gate (`demon_agrees_with_player`) | Duel pipeline | **G3** when gate enabled | `DemonTarotPrompts.BuildGatePrompt` |
+| J1–J3 | LLM JSON duel judge (full rubric in model) | Duel pipeline / experiments | **No** (replaced by rubric) | `TarotJudgePrompts` |
+| P1–P2 | Judge verdict **prose** (tent voice) | Main scene Make Judgement | **P2** when `useLlmJudgeProse` | `JudgeVerdictProsePrompts` |
+| ST1 | Smoke-test positive reader | `TarotReadingSmokeTest` only | **No** | `TarotReadingSmokeTest.BuildPositivePrompt` |
+| — | Rule-based duel scoring | Main scene | **Yes** (authoritative) | `FortuneDuelRubric` (not an LLM prompt) |
+
+---
+
+## Representative success and failure outputs
+
+These are **patterns** seen during playtests and log review—not fixed golden files.
+
+### Spirit reading (S1–S7)
+
+| Outcome | Example symptom | Why |
+|---------|-----------------|-----|
+| **Failed** | “The remote control of your fate…” / cheese, kitchen, wrestling props | Model restaged **card title jokes** instead of abstract **Greed / Vanity / Chaos / Power** (v1–v5). |
+| **Failed** | `hunger-and-excess lane:` or `Line 1 moral lean: Bad` in player UI | **Prompt scaffolding leaked** into curse text (v5–v6). |
+| **Failed** | Four sentences, or one wall of text | **Structure drift** before word-budget + five-sentence contract (v1–v5). |
+| **Succeeded** | Five sentences; each names **Greed**, **Vanity**, **Chaos**, and/or **Power**; no caption nouns | **v7** outline fixes themes/anchors before pass-2 prose. |
+| **Partial** | Console: `[DemonTwoPass] Outline parse failed` then acceptable curse | JSON outline sloppy → **spread-synthesized outline** or **v6 single-pass** fallback (`DemonTarotTwoPass`). |
+
+### Spirit gate (G1–G3)
+
+| Outcome | Example | Why |
+|---------|---------|-----|
+| **Failed** | `{"demon_agrees_with_player":true}` on “Vanity hurt you, but you will prosper if you let go.” | Model treated **dark themes + hopeful close** as “cruel enough” (G1–G2). |
+| **Succeeded** | `false` + reason citing net helpful close; or `true` only on irreversible doom | **G3** few-shots + **`DemonGatePositiveHeuristic`** override on false `agree=true`. |
+
+### LLM JSON judge (J1–J3, legacy)
+
+| Outcome | Example | Why |
+|---------|---------|-----|
+| **Failed** | Markdown score dump or `Let's begin…` before `{` | Model ignored **JSON-only** contract (J1). |
+| **Failed** | Rationale: “theme_alignment was strong…” | **Field names in prose** (J2). |
+| **Failed** | Winner flips run-to-run on same readings | **Non-reproducible** vs design rubric → scoring moved to **`FortuneDuelRubric`** (J3 kept for harness only). |
+
+### Judge verdict prose (P1–P2, production narration)
+
+| Outcome | Example | Why |
+|---------|---------|-----|
+| **Failed** | “I, the ancient arbiter, proclaim to the crowd…” | Wrong **cast** (arbiter/crowd, first person). |
+| **Failed** | “The fortune teller wins 44 to 38 on theme_alignment…” | **Score dump** / rubric labels in customer-facing text. |
+| **Succeeded** | 2–4 sentences; names **the tent**, **the fortune teller**, **the spirit**, **the customer**; last line: “…the tent awards this duel to the **fortune teller**.” | **P2** `JudgeVerdictProsePrompts` + rubric-settled facts; UI may append a short winner line. |
+
+### Smoke-test positive reader (ST1, dev only)
+
+| Outcome | Example | Why |
+|---------|---------|-----|
+| **Succeeded** | 2–4 uplifting sentences, no theme proper nouns | Good for early Ollama wiring tests. |
+| **N/A in production** | — | Main tent uses **player-typed** fortune, not this prompt. |
 
 ---
 
@@ -126,9 +194,9 @@ See **Latest gate prompt** below. Code override remains for false positives on `
 
 ---
 
-## Judge — LLM prompt evolution
+## Judge — LLM JSON prompt evolution (legacy harness)
 
-**Note:** Main game **Make Judgement** uses **`FortuneDuelRubric`** (deterministic). `TarotJudgePrompts.BuildJudgePrompt` is **legacy / experiments** (`TarotReadingDuelPipeline`, tests).
+**Note:** Main game **Make Judgement** scores with **`FortuneDuelRubric`** (deterministic). `TarotJudgePrompts.BuildJudgePrompt` is **legacy / experiments** (`TarotReadingDuelPipeline`, tests). Customer-facing narration uses **`JudgeVerdictProsePrompts`** (see next section).
 
 Scoring dimensions (LLM): `theme_alignment`, `morality_role_fit`, `persuasiveness`, `role_fidelity`, `energy_bonus` (player only, injected by game), `total`, `winner`, `rationale`, `confidence`.
 
@@ -161,7 +229,37 @@ Scoring dimensions (LLM): `theme_alignment`, `morality_role_fit`, `persuasivenes
 - Slow, costly, **non-reproducible** vs design rubric in `FortuneDuelRubric` / `PLAYER_DUEL_SCORING_GUIDE.md`.
 - Replaced for shipped flow; prompt kept for harness.
 
-See **Latest judge prompt** below.
+See **Latest LLM JSON judge prompt** below.
+
+---
+
+## Judge — verdict prose prompt evolution (production narration)
+
+Scoring is always **`FortuneDuelRubric`**; the LLM only writes the **tent’s spoken ruling** after totals are fixed.
+
+### P1 — Reuse full JSON judge for UI text
+
+**Intent:** One Ollama call returns winner + scores + rationale.
+
+**What didn’t work:**
+
+- Slow and **non-reproducible** compared to the coded rubric.
+- Rationale used **arbiter / crowd / epic duel** voice instead of a booth addressing **the customer**.
+- Models **dumped numbers** or JSON field names into the verdict panel.
+
+**Reasoning:** Split **facts** (code) from **flavor** (LLM).
+
+---
+
+### P2 (latest) — Prose-only tent voice (`JudgeVerdictProsePrompts`)
+
+**Intent:** 2–4 sentences as **the tent**; cast limited to **the tent**, **the fortune teller**, **the spirit**, **the customer**; mandatory final sentence naming the winner; required theme keywords from the spread; **SETTLED FACTS** block is author-only (no score recital).
+
+**What improved:** Clear winner line, matches `PLAYER_DUEL_SCORING_GUIDE.md` outcomes, rubric stays authoritative.
+
+**Tradeoff:** Still needs Ollama at **Make Judgement**; if disabled or offline, UI shows rubric summary without prose.
+
+See **Latest judge verdict prose prompt** below.
 
 ---
 
@@ -312,7 +410,7 @@ Example shape: {"demon_agrees_with_player":false,"reason":"one short sentence"}
 
 ---
 
-## Latest judge prompt (LLM — legacy harness)
+## Latest LLM JSON judge prompt (legacy harness)
 
 Source: `Assets/Scripts/TarotJudgePrompts.cs` — `BuildJudgePrompt(cards, playerReading, demonReading, playerEnergyBonus0to10)`.
 
@@ -387,11 +485,58 @@ Shape: {"winner":"player" or "demon","player_scores":{"theme_alignment":0,"moral
 
 ---
 
+## Latest judge verdict prose prompt (production)
+
+Source: `Assets/Scripts/JudgeVerdictProsePrompts.cs` — `BuildProsePrompt(...)`. Runtime appends **REQUIRED PHRASES**, **SETTLED FACTS** (internal margins—must not be spoken), trimmed readings, and spread lines.
+
+```
+ROLE
+You speak as **the tent** — the carnival fortune booth itself — delivering the final ruling to **the customer** who waited for this duel.
+The numeric tally is already settled. Your job is a short, spoken verdict in the tent's voice (impersonal or "the tent" — never a separate arbiter character).
+
+CAST — you may name ONLY these four (exact phrases below):
+- **the tent**
+- **the fortune teller** (the human reader; never "teller" alone, never "player")
+- **the spirit** (the demon's curse; never "demon" unless quoting is unavoidable — prefer **the spirit**)
+- **the customer** (the person receiving the reading; never querent, seeker, listener, audience, crowd, or "you" addressing a camera)
+
+FORBIDDEN IN PROSE
+- First person as a judge: no I, me, my, we proclaim, I am the arbiter.
+- Extra cast: no crowd, carnival, arbiter, booth judge, ancient voice, epic duel, onlookers, fairground, ringmaster.
+- Score dump: do not recite point totals, margins, tallies, "44 points", "+24", sliders, or rubric labels.
+- Theme words **Greed**, **Vanity**, **Chaos**, **Power** may appear when weaving the draw (required below) — but do not lecture about mirrors, hunger, etc. at length; one light touch per theme is enough.
+- Markdown, headings, JSON, preamble.
+
+OUTPUT
+- **2–4 sentences**, one paragraph.
+- Explain *why* in story language tied to how the two readings sat against the draw — not as a spreadsheet.
+- Address or acknowledge **the customer** at least once.
+- **FINAL SENTENCE (mandatory):** End with one short, unmistakable declaration of who won the duel. Use the exact phrase **the fortune teller** or **the spirit** (whichever matches SETTLED FACTS).
+  (If fortune teller won: e.g. "…and so the tent awards this duel to the fortune teller.")
+  (If spirit won: e.g. "…and so the tent awards this duel to the spirit.")
+- Do not end on ambiguity, a tie question, or "only time will tell."
+
+[Then: REQUIRED PHRASES — each must appear at least once, including the tent / fortune teller / spirit / customer,
+ spread theme words Greed|Vanity|Chaos|Power, winner name again, "favor", and "magical energy" when energy was committed]
+
+SETTLED FACTS (author-only — match the winner; do NOT repeat these numbers in your prose):
+- Winner: the fortune teller | the spirit
+- Fortune teller favor total / Spirit favor total / Margin (internal)
+- Magical energy committed; optional spread moral tailwinds; official one-line meaning
+
+CONTEXT (for meaning only — do not quote either reading at length):
+FORTUNE TELLER READING: …
+SPIRIT READING: …
+[+ private spread lines via TarotLlmSpreadContext]
+```
+
+---
+
 ## Related (not spirit/judge duel)
 
 **Smoke-test positive reader** (`TarotReadingSmokeTest.BuildPositivePrompt`) — early harness for uplifting carnival fortune; 2–4 sentences; no Greed/Vanity/Chaos/Power in output. Not used in main tent flow.
 
-**Rule-based “judge” in production** — no LLM prompt; see `FortuneDuelRubric.cs` and `PLAYER_DUEL_SCORING_GUIDE.md`.
+**Rule-based scoring in production** — no LLM prompt; see `FortuneDuelRubric.cs` and `PLAYER_DUEL_SCORING_GUIDE.md`.
 
 ---
 
@@ -403,7 +548,9 @@ Shape: {"winner":"player" or "demon","player_scores":{"theme_alignment":0,"moral
 | Spirit outline pass | `DemonTarotPrompts.cs` | `BuildReadingOutlinePrompt` |
 | Spirit prose pass | `DemonTarotPrompts.cs` | `BuildReadingSecondPassProsePrompt` |
 | Spirit gate | `DemonTarotPrompts.cs` | `BuildGatePrompt` |
-| LLM judge | `TarotJudgePrompts.cs` | `BuildJudgePrompt` |
+| Judge verdict prose | `JudgeVerdictProsePrompts.cs` | `BuildProsePrompt` |
+| LLM JSON judge (legacy) | `TarotJudgePrompts.cs` | `BuildJudgePrompt` |
 | Spread appendix | `TarotLlmSpreadContext.cs` | `AppendSpreadLines` |
+| Smoke-test positive reader | `TarotReadingSmokeTest.cs` | `BuildPositivePrompt` |
 
-*Last synced with codebase: spirit/judge prompt sources as of document creation.*
+*Last synced with codebase: May 15, 2026 (`DemonTarotPrompts`, `JudgeVerdictProsePrompts`, `TarotJudgePrompts`).*

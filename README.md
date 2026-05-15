@@ -1,75 +1,128 @@
-# GADS7331 - Fortune Teller Game
+# GADS7331 — Fortune Teller Game
 
-## Project Overview
-This Unity game is a narrative strategy experience where the player is a 10th generation carnival fortune teller bound by ancestral pacts. During each reading, the player gives a positive interpretation of drawn tarot cards while a demon AI attempts a negative interpretation to claim customer souls. A second AI judge decides the winner and drives consequences in the wider carnival simulation.
+Unity 6 narrative strategy prototype: a carnival fortune teller duels a bound **spirit** over each three-card reading. A **rule-based rubric** decides the winner; **Ollama** (local LLM) writes the spirit’s curse and the tent’s verdict announcement.
 
-## Core Features
-- Tarot reading duel: player vs demon AI
-- Judge AI outcome arbitration
-- Hidden card themes:
-  - Greed
-  - Vanity
-  - Chaos
-  - Power
-- Carnival management layer (resources, reputation, time)
-- Demon dance battle mini-game
+---
 
-## Current Prototype Status
-- Card data stored in ScriptableObject assets.
-- Scene currently supports a hardcoded 3-card draw for UI hookup testing.
-- Deck will expand beyond 3 cards as development continues.
-- **Stage 1 LLM:** `OllamaClient` + `TarotReadingSmokeTest` (positive prompt dev harness) and `DemonTarotReader` (negative demon prompt).
-- **Demon reading (optional two-pass):** `DemonTarotTwoPass` coordinates pass 1 (JSON outline via `DemonTarotPrompts.BuildReadingOutlinePrompt`) and pass 2 (prose via `BuildReadingSecondPassProsePrompt`). Parsed with `DemonReadingOutlineParser`; invalid outline → automatic **single-pass** fallback (`BuildReadingPrompt`). Toggle on **`DemonTarotReader`** (**Use Two Pass Reading**) and on **`TarotReadingDuelPipeline`** (**Use Two Pass Demon Reading**). Console: `[DemonTwoPass] Outline OK…` vs outline parse fallback warning.
-- **Duel pipeline:** `TarotReadingDuelPipeline` — player text (`TMP_InputField`) → optional demon **gate** (JSON) → if not agreed, demon **reading** (shared `DemonTarotPrompts`, optionally two-pass above) → **verdict** via deterministic **`FortuneDuelRubric`** (no judge LLM in this script; `onJudgeComplete` fires with winner + one-line explanation after scoring; omitted when the demon **agrees at the gate** and the run ends early). Console `[Duel][Judge]` matches that step. Optional hotkey **J** or UI button calling `RunDuel()`. `onGateAgreedWithPlayer(bool)` fires after gate; `onDemonReadingComplete` after demon text when a counter-reading ran.
+## Quick start
 
-## Ollama (local LLM) — test setup
-1. Install [Ollama](https://ollama.com) and run `ollama serve` (default `http://127.0.0.1:11434`).
-2. Pull a model, e.g. `ollama pull llama3.2` (or set `OllamaClient`’s model name to match whatever you installed).
-3. Add `OllamaClient`. Optionally add `TarotReadingSmokeTest` and/or `DemonTarotReader` (same GameObject or separate).
-4. Assign **`TarotCardPull`** on both `TarotReadingSmokeTest` and `DemonTarotReader`. Link **Ollama** to `OllamaClient`; assign `TMP_Text` if desired. **`TarotPullSpreadBuilder`** matches themes by **card title** to `tarotDatabase` entries (works with random pulls). No edits required on `TarotCardPull` itself.
-5. Play Mode: enable **Listen For Hotkey** on Smoke Test / Demon Reader if you want **I** / **D** (off by default so typing in `TMP_InputField` does not fire them). Hotkeys are ignored while a `TMP_InputField` is focused. Or use **Request On Start** on either component.
-6. **Duel:** Add `TarotReadingDuelPipeline`, assign `OllamaClient`, `TarotCardPull`, and a **TMP_InputField** for the player’s reading. Hook a UI **Button** to `RunDuel()` or enable **Listen For Hotkey** (**J**). Optional: `statusText`, `gateReasonText`, `demonReadingText`, `judgeResultText`. If **Demon Reading Text** is empty, assign **Demon Reading Output Fallback** to your **`DemonTarotReader`** component so duel demon prose goes to the same label as solo **D**. With **Log Gate And Judge To Console**, the full demon body also prints as `[Duel][Demon]`. UnityEvents: `onGateAgreedWithPlayer`, `onDemonReadingComplete`, `onJudgeComplete`.
+1. Install [Ollama](https://ollama.com), run `ollama serve`, and `ollama pull llama3.2` (or match the model name on **AIManager → Ollama Client**).
+2. Open the project in **Unity 6000.3.14f1** (Unity Hub).
+3. Play **`Assets/Scenes/MainMenu.unity`** (or **`MainScene.unity`** directly).
+4. **Draw Cards** → wait for spirit text → type fortune → **Read Fortune** → **Make Judgement** → **Accept Verdict**.
 
-### Wiring `TarotReadingDuelPipeline` on **AIManager** (typical setup)
-1. Select **AIManager** → **Add Component** → **Tarot Reading Duel Pipeline**.
-2. **Ollama:** drag the same **Ollama Client** on this object (or the reference you already use).
-3. **Card Pull:** drag **GameManager**’s **Tarot Card Pull** (same reference as Smoke Test / Demon Reader).
-4. **Player Reading Input:** drag the **Player Input** object’s **TMP_InputField** component (the text field under *Player Input Background*).
-5. **Make Reading button:** in the **Button** component → **On Click ()** → add a slot → drag **AIManager** → choose **TarotReadingDuelPipeline → RunDuel** (no argument). Leave **Listen For Hotkey** off if you only use the button.
-6. **Console:** leave **Log Gate And Judge To Console** checked (default). You will see `[Duel][Gate] …` after every gate, an extra line when the demon **accepts** and skips the judge, and `[Duel][Judge] winner=…` after a full duel. Turn on **Log Status To Console** if you also want step spam (`Gate…`, `Demon…`, etc.).
-7. **Smoke Test / Demon Reader:** keep them for **I** / **D** quick tests; the duel pipeline does **not** replace them—it runs the full chain when you click **Make Reading**.
+Full install, specs, and troubleshooting: **`setup.md`**.
 
-## Planned AI Architecture (Ollama)
-- Local LLM runtime via Ollama
-- Three AI roles:
-  - Player-side positive interpretation assistant (optional support mode)
-  - Demon negative interpretation agent
-  - Ancient-object judge agent
-- Rule: if player interpretation is already negative, demon agrees and judge phase is skipped.
+---
 
-## Gameplay Loop
-1. Customer enters tent
-2. Customer presents problem/personality
-3. Tarot cards are drawn
-4. Player interprets cards positively
-5. Demon AI interprets negatively
-6. Judge AI decides strongest interpretation
-7. Outcome updates world/resources/reputation
-8. Downtime with demon (dialogue/deals)
-9. Next customer
+## Core gameplay (MainScene)
 
-## Repository Documentation
-- `PLAN.md` — development roadmap and milestones (keep **Current State** in sync with the repo).
-- `RUNNING_LOG.md` — chronological implementation notes (append a dated section per meaningful session).
-- `requirements.txt` — feature and technical requirements snapshot (update when behavior or constraints change).
-- `PLAYER_DUEL_SCORING_GUIDE.md` — **player-facing**: how the fortune duel is scored (themes, morals, word lists, prediction checklist); matches `FortuneDuelRubric`.
+| Step | Action | LLM? |
+|------|--------|------|
+| 1 | Draw Cards (3-card spread) | Spirit starts when pull finishes |
+| 2 | Read Fortune (typed reading + magical energy commit) | No |
+| 3 | Make Judgement | Rubric instant; optional judge **prose** via Ollama |
+| 4 | Accept Verdict | Updates customers / energy (`GameManager`) |
 
-## Getting Started (Unity)
-1. Open project in Unity Hub.
-2. Load `SampleScene`.
-3. Ensure tarot data asset is assigned to the game manager component.
-4. Run scene to verify card text/image UI hookups.
+- **Hidden card data:** themes (Greed, Vanity, Chaos, Power) and morals (Good, Neutral, Bad).
+- **Scoring rules (players):** `PLAYER_DUEL_SCORING_GUIDE.md` — matches `FortuneDuelRubric.cs`.
+- **Win/lose:** More teller favor than spirit → +1 customer; spirit wins → −1 customer (game over at 0).
 
-## Notes
-- This project is under active iteration.
-- Documentation files are intended to be updated continuously as milestones are implemented.
+---
+
+## AI architecture
+
+| Component | Role |
+|-----------|------|
+| `OllamaClient` | HTTP client to local Ollama |
+| `DemonTarotReader` + `DemonTarotTwoPass` | Spirit curse (optional outline → prose) |
+| `FortuneFlowController` | Main tent flow, rubric verdict, optional judge prose |
+| `FortuneDuelRubric` | **Authoritative scoring** (no LLM) |
+| `JudgeVerdictProsePrompts` | Tent voice announcement only |
+| `TarotReadingDuelPipeline` | **Dev harness** — gate + spirit + rubric (optional) |
+
+Details: **`ollama-plan.md`**. Prompt archive: **`prompts-used.md`**.
+
+---
+
+## Key scripts
+
+| Script | Purpose |
+|--------|---------|
+| `FortuneFlowController` | Draw / read / judge / accept flow |
+| `GameManager` | Energy, customers, verdict consequences |
+| `TarotCardPull` | Card UI and pull |
+| `DemonTarotPrompts` | Spirit and gate prompts |
+| `MainMenuController` | Load MainScene from menu |
+| `BookManager` | In-game rulebook pages |
+
+---
+
+## Project documentation
+
+| Document | Contents |
+|----------|----------|
+| **`HIGH_CONCEPT.md`** | Ideation, fantasy, why local LLM |
+| **`ollama-plan.md`** | Model, inference timing, data flow, prompts, risks |
+| **`setup.md`** | Install Unity + Ollama, run scenes, troubleshooting |
+| **`refinements-changes.md`** | Scope and decision log |
+| `PLAN.md` | Roadmap and milestones |
+| `RUNNING_LOG.md` | Session-by-session engineering notes |
+| `requirements.txt` | Requirements baseline |
+| `PLAYER_DUEL_SCORING_GUIDE.md` | Player-facing duel scoring |
+| **`prompts-used.md`** | Prompt archive (tested prompts, success/fail examples, iterations) |
+
+---
+
+## Dependencies
+
+### Engine and packages (see `Packages/manifest.json`)
+
+- Unity **6000.3.14f1**
+- Universal Render Pipeline **17.3.0**
+- Input System **1.19.0**
+- uGUI **2.0.0**
+- TextMesh Pro (bundled with project templates)
+
+### External
+
+- **Ollama** — local LLM runtime ([ollama.com](https://ollama.com))
+- Default model in project: **`llama3.2`**
+
+---
+
+## Scenes
+
+| Scene | Purpose |
+|-------|---------|
+| `Assets/Scenes/MainMenu.unity` | Start screen → loads game |
+| `Assets/Scenes/MainScene.unity` | Fortune tent gameplay |
+| `Assets/Scenes/SampleScene.unity` | Older test scene (not in build) |
+
+---
+
+## AI tools used
+
+| Tool | Use in project |
+|------|----------------|
+| **Ollama** (`llama3.2` or configured model) | Spirit curse generation; optional judge verdict prose |
+| **Cursor / AI-assisted coding** | Implementation, refactors, documentation drafts |
+| **Unity Copilot / IDE assist** | Optional; not required to build |
+
+No paid cloud LLM API is required for the shipped prototype flow.
+
+---
+
+## Credits
+
+- **Course:** GADS7331 (Game Arts & Design), Part 2 — Fortune Teller Game project  
+- **Tarot card content:** Project ScriptableObjects (`ListOfTarotCards`, `BookPages`)  
+- **UI assets:** Includes third-party **Dark UI** pack (`Assets/Dark UI/`) — see pack documentation  
+- **TextMesh Pro** — Unity  
+
+---
+
+## Repository status
+
+Active prototype. Documentation intended to stay in sync with `FortuneFlowController` and `MainScene` wiring.  
+If behavior and docs disagree, prefer **code** and file **`refinements-changes.md`** for latest decisions.
