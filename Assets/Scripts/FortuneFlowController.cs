@@ -6,7 +6,7 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Tent flow: draw 3 cards → read fortune (player text UI, no score) → spirit LLM starts only after Read Fortune → open Cards/Spirit view →
+/// Tent flow: draw 3 cards → spirit LLM starts when the pull completes → player Read Fortune →
 /// open Judge view and press <see cref="RenderVerdict"/> when ready.
 /// Magical energy for the duel is chosen on the judge slider, then committed (subtracted from global run energy) when the player presses Read Fortune; <see cref="RenderVerdict"/> uses that committed amount.
 /// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy); optional <see cref="useLlmJudgeProse"/> sends settled facts to Ollama for booth prose only. Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
@@ -16,7 +16,7 @@ public class FortuneFlowController : MonoBehaviour
     [Header("Outputs (assign 3 TextMeshPro UGUI labels)")]
     [Tooltip("Filled when the player presses Read Fortune (from the input field).")]
     public TMP_Text playerFortuneOutput;
-    [Tooltip("Set to SpiritThinkingMessage when the spirit request starts (after Read Fortune); replaced when the model returns.")]
+    [Tooltip("Set to SpiritThinkingMessage when the spirit request starts (after cards are drawn); replaced when the model returns.")]
     public TMP_Text spiritFortuneOutput;
     [Tooltip("Optional mirror on Read Fortune, optional mirror when spirit responds, and the final verdict block from Render Verdict.")]
     public TMP_Text judgeOutput;
@@ -154,6 +154,7 @@ public class FortuneFlowController : MonoBehaviour
         _cardsDrawn = true;
         gameManager?.SetCardsDrawn(true);
         LogFlow(outputStrings != null ? outputStrings.logCardsReady : null);
+        TryBeginSpiritReadingIfNeeded();
         RefreshDrawCardsButtonInteractable();
         RefreshRenderVerdictButtonInteractable();
     }
@@ -222,12 +223,10 @@ public class FortuneFlowController : MonoBehaviour
         if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorPlayerOnReadFormat))
             WriteTmp(judgeOutput, SafeFormat(outputStrings.judgeMirrorPlayerOnReadFormat, t), nameof(FortuneFlowController));
         LogFlow(outputStrings != null ? outputStrings.logAfterReadFortune : null);
-        if (_cardsDrawn)
-            TryBeginSpiritReadingAfterFortune();
         RefreshRenderVerdictButtonInteractable();
     }
 
-    /// <summary>Call when the Cards or Spirit view opens. Starts the spirit only if Read Fortune has already run this round.</summary>
+    /// <summary>Call when the Cards or Spirit view opens. Starts the spirit if cards are drawn but the request has not run yet.</summary>
     public void OnCardsViewOpened()
     {
         if (!_cardsDrawn)
@@ -242,25 +241,18 @@ public class FortuneFlowController : MonoBehaviour
             return;
         }
 
-        if (string.IsNullOrEmpty(_playerFortuneForJudge))
-        {
-            LogFlow(!string.IsNullOrEmpty(outputStrings?.logReadFortuneBeforeSpirit)
-                ? outputStrings.logReadFortuneBeforeSpirit
-                : "Read your fortune (Make Reading) before summoning the spirit — the spirit starts only after that.");
-            return;
-        }
-
-        TryBeginSpiritReadingAfterFortune();
+        TryBeginSpiritReadingIfNeeded();
         RefreshRenderVerdictButtonInteractable();
     }
 
-    void TryBeginSpiritReadingAfterFortune()
+    /// <summary>Starts the spirit LLM once per round when the spread is ready (after pull completes).</summary>
+    void TryBeginSpiritReadingIfNeeded()
     {
         if (!_cardsDrawn || spiritReader == null)
             return;
-        if (string.IsNullOrEmpty(_playerFortuneForJudge))
-            return;
         if (_spiritReadingStartedThisRound)
+            return;
+        if (!TarotPullSpreadBuilder.TryBuildSpreadForLlm(_spread, cardPull))
             return;
 
         string thinking = ResolvedSpiritThinkingMessage();
@@ -531,11 +523,14 @@ public class FortuneFlowController : MonoBehaviour
 
     string BuildJudgeVerdictBlock(string player, string spiritBody, string winnerLabel, string explanation, bool playerWon)
     {
+        string closing = ResolveWinnerClosingLine(winnerLabel, playerWon);
+        string body = explanation ?? "";
+
         if (outputStrings == null)
-            return JoinNonEmpty("\n", winnerLabel, explanation);
+            return JoinVerdictBodyAndClosing(body, closing);
 
         if (!string.IsNullOrEmpty(outputStrings.judgeVerdictCompleteFormat))
-            return SafeFormat4(outputStrings.judgeVerdictCompleteFormat, player, spiritBody, winnerLabel, explanation);
+            return JoinVerdictBodyAndClosing(SafeFormat4(outputStrings.judgeVerdictCompleteFormat, player, spiritBody, winnerLabel, explanation), closing);
 
         string simple = playerWon
             ? (string.IsNullOrEmpty(outputStrings.judgePlayerWinVerdictFormat)
@@ -546,9 +541,40 @@ public class FortuneFlowController : MonoBehaviour
                 : SafeFormat(outputStrings.judgeSpiritWinVerdictFormat, explanation));
 
         if (!string.IsNullOrEmpty(simple))
-            return simple;
+            return JoinVerdictBodyAndClosing(simple, closing);
 
-        return JoinNonEmpty("\n", winnerLabel, explanation);
+        return JoinVerdictBodyAndClosing(body, closing);
+    }
+
+    static string ResolveWinnerClosingLine(string winnerLabel, bool playerWon)
+    {
+        if (!string.IsNullOrWhiteSpace(winnerLabel))
+            return winnerLabel.Trim();
+        return playerWon
+            ? "Winner: the fortune teller."
+            : "Winner: the spirit.";
+    }
+
+    static string JoinVerdictBodyAndClosing(string body, string closing)
+    {
+        body = body?.Trim() ?? "";
+        closing = closing?.Trim() ?? "";
+        if (string.IsNullOrEmpty(body))
+            return closing;
+        if (string.IsNullOrEmpty(closing))
+            return body;
+        if (BodyAlreadyDeclaresWinner(body, closing))
+            return body;
+        return body + "\n\n" + closing;
+    }
+
+    static bool BodyAlreadyDeclaresWinner(string body, string closing)
+    {
+        string lower = body.ToLowerInvariant();
+        bool tellerWins = closing.IndexOf("fortune teller", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        if (tellerWins)
+            return lower.Contains("fortune teller") && (lower.Contains("win") || lower.Contains("victor") || lower.Contains("awards") || lower.Contains("grants"));
+        return lower.Contains("spirit") && (lower.Contains("win") || lower.Contains("victor") || lower.Contains("awards") || lower.Contains("grants"));
     }
 
     static string JoinNonEmpty(string sep, params string[] parts)
@@ -645,7 +671,7 @@ public class FortuneFlowOutputStrings
 {
     [Header("Spirit")]
     [TextArea(1, 4)]
-    [Tooltip("Written to Spirit output while the LLM runs after Read Fortune. If empty, a default line is used.")]
+    [Tooltip("Written to Spirit output while the LLM runs after cards are drawn. If empty, a default line is used.")]
     public string spiritThinkingMessage;
 
     [Header("Judge prose (LLM)")]
@@ -663,10 +689,10 @@ public class FortuneFlowOutputStrings
 
     [Header("Judge verdict (Render Verdict)")]
     [TextArea(2, 6)]
-    [Tooltip("Shown as argument {{2}} in JudgeVerdictCompleteFormat, or as a line when using simple verdict formats.")]
+    [Tooltip("Appended at the end of the verdict after LLM prose (and used as {{2}} in JudgeVerdictCompleteFormat). If empty, defaults to \"Winner: the fortune teller.\"")]
     public string winnerPlayerLabel;
     [TextArea(2, 6)]
-    [Tooltip("Shown as argument {{2}} in JudgeVerdictCompleteFormat, or as a line when using simple verdict formats.")]
+    [Tooltip("Appended at the end of the verdict after LLM prose (and used as {{2}} in JudgeVerdictCompleteFormat). If empty, defaults to \"Winner: the spirit.\"")]
     public string winnerSpiritLabel;
     [TextArea(4, 14)]
     [Tooltip("If set, Render Verdict sets Judge text to String.Format: {{0}} player fortune, {{1}} spirit text, {{2}} winner label, {{3}} one-line explanation.")]

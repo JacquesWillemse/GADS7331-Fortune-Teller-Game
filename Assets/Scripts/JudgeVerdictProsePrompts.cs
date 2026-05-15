@@ -37,9 +37,14 @@ public static class JudgeVerdictProsePrompts
         sb.AppendLine();
         sb.AppendLine("OUTPUT");
         sb.AppendLine("- **2–4 sentences**, one paragraph.");
-        sb.AppendLine("- State who won (fortune teller or spirit) in plain terms the customer understands.");
         sb.AppendLine("- Explain *why* in story language tied to how the two readings sat against the draw — not as a spreadsheet.");
         sb.AppendLine("- Address or acknowledge **the customer** at least once.");
+        sb.AppendLine("- **FINAL SENTENCE (mandatory):** End with one short, unmistakable declaration of who won the duel. Use the exact phrase **the fortune teller** or **the spirit** (whichever matches SETTLED FACTS).");
+        if (playerWon)
+            sb.AppendLine("  Required closing pattern (adapt wording slightly if needed, but the last sentence must clearly say the fortune teller won): e.g. \"…and so the tent awards this duel to the fortune teller.\"");
+        else
+            sb.AppendLine("  Required closing pattern (adapt wording slightly if needed, but the last sentence must clearly say the spirit won): e.g. \"…and so the tent awards this duel to the spirit.\"");
+        sb.AppendLine("- Do not end on ambiguity, a tie question, or \"only time will tell.\"");
         sb.AppendLine();
         AppendRequiredKeywords(sb, spread, playerWon, guaranteedWin, magicalEnergy0to100);
         sb.AppendLine();
