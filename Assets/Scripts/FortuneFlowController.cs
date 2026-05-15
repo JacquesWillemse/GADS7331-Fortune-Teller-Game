@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -8,7 +9,7 @@ using TMPro;
 /// Tent flow: draw 3 cards → read fortune (player text UI, no score) → spirit LLM starts only after Read Fortune → open Cards/Spirit view →
 /// open Judge view and press <see cref="RenderVerdict"/> when ready.
 /// Magical energy for the duel is chosen on the judge slider, then committed (subtracted from global run energy) when the player presses Read Fortune; <see cref="RenderVerdict"/> uses that committed amount.
-/// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy). Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
+/// Scoring uses <see cref="FortuneDuelRubric"/> (spread moral judge bias, theme rubric, energy); optional <see cref="useLlmJudgeProse"/> sends settled facts to Ollama for booth prose only. Assign the three <see cref="TMP_Text"/> outputs in the Inspector; all visible copy comes from <see cref="outputStrings"/>.
 /// </summary>
 public class FortuneFlowController : MonoBehaviour
 {
@@ -24,6 +25,8 @@ public class FortuneFlowController : MonoBehaviour
     [Tooltip("Optional — keeps GameManager.CardsDrawn in sync and receives round reset after Accept Verdict.")]
     [SerializeField] private GameManager gameManager;
     [SerializeField] private DemonTarotReader spiritReader;
+    [Tooltip("Same OllamaClient as the spirit reader. If empty, uses spiritReader.Ollama when available.")]
+    [SerializeField] private OllamaClient ollama;
     [SerializeField] private TMP_InputField playerFortuneInput;
     [SerializeField] private Slider magicalEnergySlider;
     [Tooltip("Shows the duel magical energy slider value (0–100). Optional.")]
@@ -49,6 +52,10 @@ public class FortuneFlowController : MonoBehaviour
     [Tooltip("If true, when totals tie after scoring, the player wins.")]
     [SerializeField] private bool tieRoundGoesToPlayer = true;
 
+    [Header("Judge prose (LLM)")]
+    [Tooltip("When on, Make Judgement runs the rubric first, then Ollama writes 3–5 sentences using required keywords. Falls back to one-line rubric text if Ollama is missing or errors.")]
+    [SerializeField] private bool useLlmJudgeProse = true;
+
     [Header("Events")]
     public UnityEvent<bool, string> onVerdictComplete;
 
@@ -65,8 +72,11 @@ public class FortuneFlowController : MonoBehaviour
     bool _spiritReadingStartedThisRound;
     /// <summary>False from the moment a new pull starts until <see cref="ResetRoundAfterVerdictAccepted"/>.</summary>
     bool _drawCardsAllowed = true;
+    bool _verdictProseInFlight;
+    Coroutine _verdictProseCoroutine;
 
     const string DefaultSpiritThinkingMessage = "The spirit is thinking…";
+    const string DefaultJudgeThinkingMessage = "The booth weighs the duel…";
 
     public bool CardsDrawn => _cardsDrawn;
 
@@ -113,6 +123,8 @@ public class FortuneFlowController : MonoBehaviour
 
     void OnDestroy()
     {
+        if (_verdictProseCoroutine != null)
+            StopCoroutine(_verdictProseCoroutine);
         if (cardPull != null)
             cardPull.onCardPullComplete.RemoveListener(OnCardPullComplete);
         if (spiritReader != null)
@@ -268,6 +280,12 @@ public class FortuneFlowController : MonoBehaviour
     /// <summary>Wired to a button on the Judge panel (e.g. "Render Verdict"). Uses player fortune, spirit output, and magical energy.</summary>
     public void RenderVerdict()
     {
+        if (_verdictProseInFlight)
+        {
+            LogFlow("Verdict prose is still being written…");
+            return;
+        }
+
         if (renderVerdictButton != null && !renderVerdictButton.interactable)
         {
             LogFlow("Make Judgement is not available yet — finish the spirit reading first.");
@@ -306,7 +324,6 @@ public class FortuneFlowController : MonoBehaviour
         }
 
         float energy = Mathf.Clamp(_committedMagicalEnergyForDuel, 0f, 100f);
-
         FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(_spread, _playerFortuneForJudge, spirit, energy);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energy);
         bool playerWon;
@@ -322,22 +339,100 @@ public class FortuneFlowController : MonoBehaviour
         _lastScoreMargin = duel.PlayerTotal - duel.DemonTotal;
         _lastPlayerWon = playerWon;
         _lastGuaranteedWin = guaranteed;
-        _verdictAwaitingAccept = true;
 
         string explanation = FortuneDuelRubric.BuildVerdictExplanationOneSentence(duel, playerWon, guaranteed, tieRoundGoesToPlayer);
         string rationale = FortuneDuelRubric.FormatRationale(duel, playerWon, energy, guaranteed);
-
         string winnerLabel = playerWon
             ? (outputStrings != null ? outputStrings.winnerPlayerLabel ?? "" : "")
             : (outputStrings != null ? outputStrings.winnerSpiritLabel ?? "" : "");
 
-        string block = BuildJudgeVerdictBlock(_playerFortuneForJudge, spirit, winnerLabel, explanation, playerWon);
-        WriteTmp(judgeOutput, block, nameof(FortuneFlowController));
+        OllamaClient client = ResolveOllamaClient();
+        if (!useLlmJudgeProse || client == null)
+        {
+            FinishVerdictDisplay(_playerFortuneForJudge, spirit, winnerLabel, explanation, playerWon, rationale);
+            return;
+        }
 
-        LogFlow(outputStrings != null ? outputStrings.logVerdictRendered : null);
-        onVerdictComplete?.Invoke(playerWon, explanation);
-        Debug.Log($"[Fortune][Judge] winner={(playerWon ? "Player" : "Spirit")} | {explanation}\n{rationale}");
+        if (_verdictProseCoroutine != null)
+            StopCoroutine(_verdictProseCoroutine);
+        _verdictProseCoroutine = StartCoroutine(CoRenderVerdictProse(
+            client, duel, playerWon, guaranteed, energy, winnerLabel, explanation, rationale,
+            _playerFortuneForJudge, spirit));
+    }
+
+    OllamaClient ResolveOllamaClient()
+    {
+        if (ollama != null)
+            return ollama;
+        if (spiritReader != null && spiritReader.Ollama != null)
+            return spiritReader.Ollama;
+        return null;
+    }
+
+    IEnumerator CoRenderVerdictProse(
+        OllamaClient client,
+        FortuneDuelScoreBreakdown duel,
+        bool playerWon,
+        bool guaranteed,
+        float energy,
+        string winnerLabel,
+        string explanation,
+        string rationale,
+        string playerFortune,
+        string spiritText)
+    {
+        _verdictProseInFlight = true;
         RefreshRenderVerdictButtonInteractable();
+
+        WriteTmp(judgeOutput, ResolvedJudgeThinkingMessage(), nameof(FortuneFlowController));
+
+        string prompt = JudgeVerdictProsePrompts.BuildProsePrompt(
+            _spread, duel, playerWon, guaranteed, energy, explanation, playerFortune, spiritText);
+
+        string prose = null;
+        string err = null;
+        yield return client.StartCoroutine(client.GenerateWait(
+            prompt,
+            s => prose = s,
+            e => err = e));
+
+        _verdictProseInFlight = false;
+        _verdictProseCoroutine = null;
+
+        if (!string.IsNullOrEmpty(err) || string.IsNullOrWhiteSpace(prose))
+        {
+            LogFlow(outputStrings != null ? outputStrings.logJudgeProseFailed : null);
+            Debug.LogWarning("[Fortune][Judge] Prose LLM failed; using rubric one-liner. " + err);
+            FinishVerdictDisplay(playerFortune, spiritText, winnerLabel, explanation, playerWon, rationale);
+            yield break;
+        }
+
+        FinishVerdictDisplay(playerFortune, spiritText, winnerLabel, prose.Trim(), playerWon, rationale);
+    }
+
+    void FinishVerdictDisplay(
+        string playerFortune,
+        string spiritText,
+        string winnerLabel,
+        string explanationOrProse,
+        bool playerWon,
+        string rationaleForLog)
+    {
+        _verdictAwaitingAccept = true;
+        string block = BuildJudgeVerdictBlock(playerFortune, spiritText, winnerLabel, explanationOrProse, playerWon);
+        WriteTmp(judgeOutput, block, nameof(FortuneFlowController));
+        LogFlow(outputStrings != null ? outputStrings.logVerdictRendered : null);
+        onVerdictComplete?.Invoke(playerWon, explanationOrProse);
+        Debug.Log($"[Fortune][Judge] winner={(playerWon ? "Player" : "Spirit")} | customer-facing prose:\n{explanationOrProse}");
+        Debug.Log($"[Fortune][Judge] rubric breakdown (console only):\n{rationaleForLog}");
+        RefreshRenderVerdictButtonInteractable();
+    }
+
+    string ResolvedJudgeThinkingMessage()
+    {
+        if (outputStrings != null && !string.IsNullOrWhiteSpace(outputStrings.judgeThinkingMessage))
+            return outputStrings.judgeThinkingMessage.Trim();
+        return DefaultJudgeThinkingMessage;
     }
 
     /// <summary>Optional: force the duel slider from run meta-energy. Normally unused — the duel slider is player-set each reading.</summary>
@@ -380,6 +475,12 @@ public class FortuneFlowController : MonoBehaviour
         _committedMagicalEnergyForDuel = 0;
         _spiritReadingStartedThisRound = false;
         _drawCardsAllowed = true;
+        _verdictProseInFlight = false;
+        if (_verdictProseCoroutine != null)
+        {
+            StopCoroutine(_verdictProseCoroutine);
+            _verdictProseCoroutine = null;
+        }
         cardPull?.HideCards();
         spiritReader?.CancelActiveReading();
         ResetMagicalEnergySliderForNewReading();
@@ -406,7 +507,7 @@ public class FortuneFlowController : MonoBehaviour
     {
         if (renderVerdictButton != null)
         {
-            if (_verdictAwaitingAccept)
+            if (_verdictAwaitingAccept || _verdictProseInFlight)
                 renderVerdictButton.interactable = false;
             else
             {
@@ -547,6 +648,11 @@ public class FortuneFlowOutputStrings
     [Tooltip("Written to Spirit output while the LLM runs after Read Fortune. If empty, a default line is used.")]
     public string spiritThinkingMessage;
 
+    [Header("Judge prose (LLM)")]
+    [TextArea(1, 4)]
+    [Tooltip("Written to Judge output while verdict prose is generated after Make Judgement. If empty, a default line is used.")]
+    public string judgeThinkingMessage;
+
     [Header("Judge mirror (optional)")]
     [TextArea(2, 8)]
     [Tooltip("If set, Read Fortune also updates Judge output via String.Format {{0}} = player text.")]
@@ -587,5 +693,6 @@ public class FortuneFlowOutputStrings
     [TextArea(1, 3)] public string logJudgeNeedReadFortune;
     [TextArea(1, 3)] public string logJudgeNeedSpirit;
     [TextArea(1, 3)] public string logJudgeSpreadFailed;
+    [TextArea(1, 3)] public string logJudgeProseFailed;
     [TextArea(1, 3)] public string logVerdictRendered;
 }

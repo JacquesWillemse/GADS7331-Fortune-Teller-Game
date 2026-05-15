@@ -273,13 +273,14 @@ public static class DemonTarotPrompts
     {
         var sb = new StringBuilder();
         sb.AppendLine("You are the carnival demon planning a three-line curse. PASS 1 — OUTLINE ONLY.");
-        sb.AppendLine("Output **one JSON object only** (no markdown fences, no preamble, no commentary). First character must be \"{\".");
-        sb.AppendLine("Shape (exact keys, lowercase theme_family values only: greed | vanity | chaos | power):");
-        sb.AppendLine("{\"line1\":{\"line\":1,\"theme_family\":\"greed\",\"anchor_1\":\"hunger\",\"anchor_2\":\"maw\"},\"line2\":{\"line\":2,\"theme_family\":\"vanity\",\"anchor_1\":\"glass\",\"anchor_2\":\"mask\"},\"line3\":{\"line\":3,\"theme_family\":\"chaos\",\"anchor_1\":\"dice\",\"anchor_2\":\"hazard\"},\"sentence5_moral_read_hint\":\"short cruel hint for net moral weather\"}");
+        sb.AppendLine("Reply with **one JSON object only**. No markdown, no ``` fences, no preamble, no commentary. The first character of your reply must be { and the last must be }.");
+        sb.AppendLine("Use **exactly** these keys: line1, line2, line3, sentence5_moral_read_hint (each line object uses line, theme_family, anchor_1, anchor_2).");
+        sb.AppendLine("Copy this shape (replace values to match the spread; theme_family must be lowercase greed | vanity | chaos | power only):");
+        sb.AppendLine("{\"line1\":{\"line\":1,\"theme_family\":\"greed\",\"anchor_1\":\"hunger\",\"anchor_2\":\"maw\"},\"line2\":{\"line\":2,\"theme_family\":\"vanity\",\"anchor_1\":\"glass\",\"anchor_2\":\"mask\"},\"line3\":{\"line\":3,\"theme_family\":\"chaos\",\"anchor_1\":\"dice\",\"anchor_2\":\"hazard\"},\"sentence5_moral_read_hint\":\"short cruel hint\"}");
         sb.AppendLine("Rules:");
-        sb.AppendLine("- theme_family for each line must match that line's Theme in the private spread (infer greed/vanity/chaos/power from the Theme tag text).");
-        sb.AppendLine("- anchor_1 and anchor_2 must be single English tokens or short hyphenates drawn from that family's vocabulary (appetite words for greed, reflection words for vanity, hazard words for chaos, command words for power).");
-        sb.AppendLine("- sentence5_moral_read_hint: ≤12 words, cruel, not comforting; may allude to themes but pass-2 will still **speak** **Greed**/**Vanity**/**Chaos**/**Power** by name per **NAMED THEMES**.");
+        sb.AppendLine("- theme_family for line N must match line N's Theme in the private spread (greed/vanity/chaos/power — lowercase, no capital Greed in JSON).");
+        sb.AppendLine("- anchor_1 and anchor_2: one English word each (or one hyphenated pair like hunger-for); no sentences.");
+        sb.AppendLine("- sentence5_moral_read_hint: ≤12 words, cruel, not comforting.");
         sb.AppendLine();
         TarotLlmSpreadContext.AppendSpreadLines(sb, cards);
         AppendThemeLaneCoverageChecklist(sb, cards);

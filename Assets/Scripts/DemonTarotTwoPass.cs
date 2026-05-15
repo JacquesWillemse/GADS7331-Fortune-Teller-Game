@@ -45,9 +45,22 @@ public static class DemonTarotTwoPass
             yield break;
         }
 
-        if (!DemonReadingOutlineParser.TryParse(outlineRaw, out DemonOutlineRoot parsed))
+        DemonOutlineRoot parsed = null;
+        if (DemonReadingOutlineParser.TryParse(outlineRaw, cards, out parsed, out string parseFail))
         {
-            Debug.LogWarning("[DemonTwoPass] Outline parse failed; falling back to single-pass demon prompt.");
+            Debug.Log("[DemonTwoPass] Outline OK; running pass-2 prose.");
+        }
+        else if (DemonReadingOutlineParser.TrySynthesizeFromSpread(cards, out parsed))
+        {
+            Debug.LogWarning(
+                "[DemonTwoPass] Model outline could not be parsed (" + parseFail + "); using spread-synthesized outline for pass 2. Raw (trimmed): " +
+                TrimForLog(outlineRaw));
+        }
+        else
+        {
+            Debug.LogWarning(
+                "[DemonTwoPass] Outline parse failed (" + parseFail + "); falling back to single-pass demon prompt. Raw (trimmed): " +
+                TrimForLog(outlineRaw));
             yield return ollama.StartCoroutine(ollama.GenerateWait(
                 DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions, fortuneTellerReadingForBrevity),
                 onSuccess,
@@ -55,11 +68,17 @@ public static class DemonTarotTwoPass
             yield break;
         }
 
-        Debug.Log("[DemonTwoPass] Outline OK; running pass-2 prose.");
-
         string outlineJson = JsonUtility.ToJson(parsed);
         string prosePrompt = DemonTarotPrompts.BuildReadingSecondPassProsePrompt(
             cards, outlineJson, additionalDemonInstructions, fortuneTellerReadingForBrevity);
         yield return ollama.StartCoroutine(ollama.GenerateWait(prosePrompt, onSuccess, onError));
+    }
+
+    static string TrimForLog(string raw, int max = 400)
+    {
+        if (string.IsNullOrEmpty(raw))
+            return "(empty)";
+        string t = raw.Replace("\r\n", " ").Replace("\n", " ").Trim();
+        return t.Length <= max ? t : t.Substring(0, max) + "…";
     }
 }

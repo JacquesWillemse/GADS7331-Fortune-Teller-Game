@@ -14,6 +14,9 @@ public class DemonTarotReader : MonoBehaviour
     /// <summary> UI target for demon prose; duel pipeline can mirror here if its own field is unset. </summary>
     public TMP_Text DemonOutputText => demonOutput;
 
+    /// <summary>Shared Ollama client (e.g. for <see cref="FortuneFlowController"/> judge prose).</summary>
+    public OllamaClient Ollama => ollama;
+
     [SerializeField] private OllamaClient ollama;
     [SerializeField] private TarotCardPull cardPull;
     [SerializeField] private bool requestOnStart;
