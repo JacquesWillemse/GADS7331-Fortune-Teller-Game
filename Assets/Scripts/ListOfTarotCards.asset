@@ -20,16 +20,16 @@ MonoBehaviour:
   - cardName: Woman with an unsustainable head to mohawk ratio
     cardTheme: Vanity
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 47f419058b51c1b4d9ad2373b2f54a1d, type: 3}
   - cardName: 'Heavy-Weight wrestling match in a 3 Star Michelin restaurant '
     cardTheme: Chaos
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 86a8967fe82d5e4448c38b757a87ebd4, type: 3}
   - cardName: 'Horse shooting a farmer with a broken leg '
     cardTheme: Power
     cardMoral: 0
     tarotCardImage: {fileID: 0}
-  - cardName: 'Waxing a grizzly bear '
+  - cardName: 'Shaving a grizzly bear '
     cardTheme: Vanity
     cardMoral: 1
     tarotCardImage: {fileID: 21300000, guid: 8a3e71630ede7ce4dacaf05dbb049ae1, type: 3}
@@ -40,7 +40,7 @@ MonoBehaviour:
   - cardName: Holding the Remote Control in a large family
     cardTheme: Power
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 4383ad2c7a1c71540bc74b2d21f8de62, type: 3}
   - cardName: Wishing for a cold snap in a retirement home
     cardTheme: Chaos
     cardMoral: 2
