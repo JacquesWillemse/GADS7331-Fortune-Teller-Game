@@ -15,7 +15,8 @@ public static class JudgeVerdictProsePrompts
         float magicalEnergy0to100,
         string officialOneLineSummary,
         string playerReading,
-        string spiritReading)
+        string spiritReading,
+        FortuneClientSpawner.WealthType clientWealth)
     {
         var sb = new StringBuilder();
         sb.AppendLine("ROLE");
@@ -33,6 +34,7 @@ public static class JudgeVerdictProsePrompts
         sb.AppendLine("- Extra cast: no crowd, carnival, arbiter, booth judge, ancient voice, epic duel, onlookers, fairground, ringmaster.");
         sb.AppendLine("- Score dump: do not recite point totals, margins, tallies, \"44 points\", \"+24\", sliders, or rubric labels.");
         sb.AppendLine("- Theme words **Greed**, **Vanity**, **Chaos**, **Power** may appear when weaving the draw (required below) — but do not lecture about mirrors, hunger, etc. at length; one light touch per theme is enough.");
+        sb.AppendLine("- You may allude lightly to whether **the customer** is wealthy or poor when explaining who read the booth better — do not name 3D props.");
         sb.AppendLine("- Markdown, headings, JSON, preamble.");
         sb.AppendLine();
         sb.AppendLine("OUTPUT");
@@ -46,9 +48,9 @@ public static class JudgeVerdictProsePrompts
             sb.AppendLine("  Required closing pattern (adapt wording slightly if needed, but the last sentence must clearly say the spirit won): e.g. \"…and so the tent awards this duel to the spirit.\"");
         sb.AppendLine("- Do not end on ambiguity, a tie question, or \"only time will tell.\"");
         sb.AppendLine();
-        AppendRequiredKeywords(sb, spread, playerWon, guaranteedWin, magicalEnergy0to100);
+        AppendRequiredKeywords(sb, spread, playerWon, guaranteedWin, magicalEnergy0to100, clientWealth);
         sb.AppendLine();
-        AppendSettledFacts(sb, duel, playerWon, guaranteedWin, magicalEnergy0to100, officialOneLineSummary);
+        AppendSettledFacts(sb, duel, playerWon, guaranteedWin, magicalEnergy0to100, officialOneLineSummary, clientWealth);
         sb.AppendLine();
         sb.AppendLine("CONTEXT (for meaning only — do not quote either reading at length):");
         sb.AppendLine("FORTUNE TELLER READING:");
@@ -57,7 +59,7 @@ public static class JudgeVerdictProsePrompts
         sb.AppendLine("SPIRIT READING:");
         sb.AppendLine(TrimForPrompt(spiritReading, 900));
         sb.AppendLine();
-        TarotLlmSpreadContext.AppendSpreadLines(sb, spread);
+        TarotLlmSpreadContext.AppendSpreadLines(sb, spread, clientWealth);
         return sb.ToString();
     }
 
@@ -66,7 +68,8 @@ public static class JudgeVerdictProsePrompts
         IReadOnlyList<TarotCardData> spread,
         bool playerWon,
         bool guaranteedWin,
-        float magicalEnergy0to100)
+        float magicalEnergy0to100,
+        FortuneClientSpawner.WealthType clientWealth)
     {
         var words = new List<string> { "the tent", "the fortune teller", "the spirit", "the customer" };
         CollectThemeWords(spread, words);
@@ -82,6 +85,8 @@ public static class JudgeVerdictProsePrompts
             words.Add("magical energy");
         else if (magicalEnergy0to100 > 0f)
             words.Add("magical energy");
+
+        words.Add(FortuneClientWealthContext.LabelFor(clientWealth));
 
         sb.AppendLine("REQUIRED PHRASES (each must appear at least once, exact wording):");
         var seen = new HashSet<string>();
@@ -114,10 +119,12 @@ public static class JudgeVerdictProsePrompts
         bool playerWon,
         bool guaranteedWin,
         float magicalEnergy0to100,
-        string officialOneLineSummary)
+        string officialOneLineSummary,
+        FortuneClientSpawner.WealthType clientWealth)
     {
         sb.AppendLine("SETTLED FACTS (author-only — match the winner; do NOT repeat these numbers in your prose):");
         sb.Append("- Winner: ").AppendLine(playerWon ? "the fortune teller" : "the spirit");
+        sb.Append("- Customer wealth: ").AppendLine(FortuneClientWealthContext.LabelFor(clientWealth));
         if (guaranteedWin)
             sb.AppendLine("- Outcome: full magical energy — fortune teller wins by decree.");
         sb.Append("- Fortune teller favor total: ").Append(duel.PlayerTotal).AppendLine(" (internal).");
@@ -137,6 +144,14 @@ public static class JudgeVerdictProsePrompts
             sb.AppendLine("- Theme echo favored the fortune teller's wording.");
         else if (duel.DemonThemeIdentification > duel.PlayerThemeIdentification)
             sb.AppendLine("- Theme echo favored the spirit's curse.");
+        if (duel.PlayerDescriptionEcho > duel.DemonDescriptionEcho)
+            sb.AppendLine("- Vignette echo (card imagery in words) favored the fortune teller.");
+        else if (duel.DemonDescriptionEcho > duel.PlayerDescriptionEcho)
+            sb.AppendLine("- Vignette echo favored the spirit's curse.");
+        if (duel.PlayerWealthFit > duel.DemonWealthFit)
+            sb.AppendLine("- Reading fit the customer's wealth better on the fortune teller's side.");
+        else if (duel.DemonWealthFit > duel.PlayerWealthFit)
+            sb.AppendLine("- Reading fit the customer's wealth better on the spirit's side.");
         if (duel.PlayerAlignment > duel.DemonAlignment)
             sb.AppendLine("- Hope-tone favored the fortune teller.");
         else if (duel.DemonAlignment > duel.PlayerAlignment)

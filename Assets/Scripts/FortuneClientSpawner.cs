@@ -57,7 +57,7 @@ public class FortuneClientSpawner : MonoBehaviour
     [Tooltip("Tent camera for world UI raycasts and billboarding. Falls back to Camera.main.")]
     [SerializeField] private Camera callInEventCamera;
     [SerializeField] private Vector3 callInHeadOffset = new Vector3(0f, 2.2f, 0f);
-    [SerializeField] private float callInWorldCanvasScale = 0.01f;
+    [SerializeField] private float callInWorldCanvasScale = 0.0125f;
     [Tooltip("Optional — disabled after the client is seated until the next SpawnClient.")]
     [SerializeField] private Button callInButton;
 
@@ -65,8 +65,11 @@ public class FortuneClientSpawner : MonoBehaviour
 
     [Header("Spawn")]
     [SerializeField] private bool spawnOnStart = true;
+    [Tooltip("When on, maps Char / Suit / Top Hat / Glasses / Barrel from child names under Client Character.")]
+    [SerializeField] private bool autoResolveMeshesByName = true;
     [Tooltip("Chance that the next client is Rich; otherwise Poor.")]
     [SerializeField, Range(0f, 1f)] private float richProbability = 0.5f;
+    [SerializeField] private bool logSpawnToConsole = true;
 
     [Header("Events")]
     public UnityEvent<WealthType> onClientSpawned;
@@ -102,7 +105,9 @@ public class FortuneClientSpawner : MonoBehaviour
 
     void Awake()
     {
-        DisableAllProps();
+        if (autoResolveMeshesByName)
+            AutoResolveMeshesFromHierarchy();
+        DisableAllApparel();
         ResolveCallInReferences();
         if (callInButton != null)
             callInButton.onClick.AddListener(CallClientIn);
@@ -117,7 +122,14 @@ public class FortuneClientSpawner : MonoBehaviour
     void Start()
     {
         if (spawnOnStart)
-            SpawnClient();
+            StartCoroutine(SpawnClientAfterCameraReady());
+    }
+
+    IEnumerator SpawnClientAfterCameraReady()
+    {
+        // Wait one frame so CameraManager can enable the tent camera first.
+        yield return null;
+        SpawnClient();
     }
 
     /// <summary>Wire to the Call Client In button.</summary>
@@ -154,19 +166,86 @@ public class FortuneClientSpawner : MonoBehaviour
 
         _clientCalledIn = false;
         SetClientVisible(true);
-        DisableAllProps();
+        DisableAllApparel();
         _activeProps.Clear();
 
         _wealth = Random.value < richProbability ? WealthType.Rich : WealthType.Poor;
-        ClientProp[] pool = _wealth == WealthType.Rich ? RichProps : PoorProps;
+        ClientProp[] pool = GetAvailableProps(_wealth == WealthType.Rich ? RichProps : PoorProps);
 
-        int propCount = Random.Range(1, pool.Length + 1);
-        PickAndEnableProps(pool, propCount);
+        EnableBaseBody();
+
+        if (pool.Length == 0)
+        {
+            Debug.LogWarning($"[FortuneClientSpawner] No {_wealth} prop meshes found under client.", this);
+        }
+        else
+        {
+            int propCount = Random.Range(1, pool.Length + 1);
+            PickAndEnableProps(pool, propCount);
+        }
 
         PlaceClientAt(doorWaypoint);
         SetCallInPromptVisible(true);
         RefreshCallInButton();
         onClientSpawned?.Invoke(_wealth);
+
+        if (logSpawnToConsole)
+            Debug.Log($"[FortuneClientSpawner] Spawned {_wealth} client with props: {FormatActiveProps()}", this);
+    }
+
+    string FormatActiveProps()
+    {
+        if (_activeProps.Count == 0)
+            return "(none)";
+        return string.Join(", ", _activeProps);
+    }
+
+    void AutoResolveMeshesFromHierarchy()
+    {
+        if (clientCharacter == null)
+            return;
+
+        foreach (Transform t in clientCharacter.GetComponentsInChildren<Transform>(true))
+        {
+            switch (t.name)
+            {
+                case "Char":
+                case "Body":
+                    clientBody = t.gameObject;
+                    break;
+                case "Suit":
+                    richSuit = t.gameObject;
+                    break;
+                case "Top Hat":
+                case "TopHat":
+                    richTopHat = t.gameObject;
+                    break;
+                case "Monocle":
+                    richMonocle = t.gameObject;
+                    break;
+                case "Barrel":
+                    poorBarrel = t.gameObject;
+                    break;
+                case "Glasses":
+                    poorGlasses = t.gameObject;
+                    break;
+                case "Broken Hat":
+                case "BrokenHat":
+                    poorBrokenHat = t.gameObject;
+                    break;
+            }
+        }
+    }
+
+    ClientProp[] GetAvailableProps(ClientProp[] pool)
+    {
+        var available = new List<ClientProp>(pool.Length);
+        for (int i = 0; i < pool.Length; i++)
+        {
+            if (GetPropObject(pool[i]) != null)
+                available.Add(pool[i]);
+        }
+        return available.ToArray();
     }
 
     IEnumerator MoveClientToSeat()
@@ -248,8 +327,9 @@ public class FortuneClientSpawner : MonoBehaviour
         }
     }
 
-    void DisableAllProps()
+    void DisableAllApparel()
     {
+        SetPropActive(clientBody, false);
         SetPropActive(richMonocle, false);
         SetPropActive(richSuit, false);
         SetPropActive(richTopHat, false);
@@ -258,36 +338,32 @@ public class FortuneClientSpawner : MonoBehaviour
         SetPropActive(poorGlasses, false);
     }
 
-    void SetClientVisible(bool visible)
+    void EnableBaseBody()
     {
-        if (clientCharacter != null)
-            clientCharacter.SetActive(visible);
-
         if (clientBody != null)
-            clientBody.SetActive(visible);
-        else if (visible && clientCharacter != null)
-            TryEnableDefaultBody(clientCharacter.transform);
-    }
-
-    void TryEnableDefaultBody(Transform root)
-    {
-        for (int i = 0; i < root.childCount; i++)
         {
-            Transform child = root.GetChild(i);
-            if (IsKnownProp(child.gameObject))
-                continue;
-            if (child.GetComponentInChildren<Renderer>(true) != null)
+            SetPropActive(clientBody, true);
+            return;
+        }
+
+        if (clientCharacter == null)
+            return;
+
+        foreach (Transform t in clientCharacter.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name == "Char" || t.name == "Body")
             {
-                child.gameObject.SetActive(true);
+                clientBody = t.gameObject;
+                SetPropActive(clientBody, true);
                 return;
             }
         }
     }
 
-    bool IsKnownProp(GameObject go)
+    void SetClientVisible(bool visible)
     {
-        return go == richMonocle || go == richSuit || go == richTopHat
-            || go == poorBarrel || go == poorBrokenHat || go == poorGlasses;
+        if (clientCharacter != null)
+            clientCharacter.SetActive(visible);
     }
 
     void RefreshCallInButton()
@@ -320,6 +396,8 @@ public class FortuneClientSpawner : MonoBehaviour
         if (callInPromptRoot == null)
             return;
 
+        DetachCallInPromptFromClient();
+
         if (_callInWorldUi == null)
             _callInWorldUi = callInPromptRoot.GetComponent<ClientCallInWorldUI>();
         if (_callInWorldUi == null)
@@ -329,17 +407,58 @@ public class FortuneClientSpawner : MonoBehaviour
             ? callInHeadAnchor
             : clientCharacter != null ? clientCharacter.transform : null;
 
-        Camera cam = callInEventCamera != null ? callInEventCamera : Camera.main;
+        Camera cam = ResolveCallInCamera();
         _callInWorldUi.Configure(follow, cam, callInHeadOffset, callInWorldCanvasScale);
+        _callInWorldUi.ApplyWorldSpaceSetup();
+    }
+
+    void DetachCallInPromptFromClient()
+    {
+        if (callInPromptRoot == null || clientCharacter == null)
+            return;
+
+        Transform promptTransform = callInPromptRoot.transform;
+        if (promptTransform.parent == null)
+            return;
+
+        if (promptTransform.IsChildOf(clientCharacter.transform))
+            promptTransform.SetParent(null, true);
+    }
+
+    Camera ResolveCallInCamera()
+    {
+        if (callInEventCamera != null && callInEventCamera.isActiveAndEnabled)
+            return callInEventCamera;
+
+        Camera main = Camera.main;
+        if (main != null && main.isActiveAndEnabled)
+            return main;
+
+        Camera[] cameras = Camera.allCameras;
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            if (cameras[i] != null && cameras[i].isActiveAndEnabled)
+                return cameras[i];
+        }
+
+        return callInEventCamera;
     }
 
     void SetCallInPromptVisible(bool visible)
     {
-        if (callInPromptRoot != null)
-            callInPromptRoot.SetActive(visible);
+        if (callInPromptRoot == null)
+            return;
 
         if (visible)
+        {
+            DetachCallInPromptFromClient();
+            callInPromptRoot.SetActive(true);
             EnsureCallInWorldUi();
+        }
+        else
+        {
+            callInPromptRoot.SetActive(false);
+        }
 
         RefreshCallInButton();
     }

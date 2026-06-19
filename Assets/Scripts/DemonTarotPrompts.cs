@@ -10,7 +10,8 @@ public static class DemonTarotPrompts
     public static string BuildReadingPrompt(
         IReadOnlyList<TarotCardData> cards,
         string additionalDemonInstructions,
-        string fortuneTellerReadingForBrevity = null)
+        string fortuneTellerReadingForBrevity = null,
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
     {
         var sb = new StringBuilder();
         sb.AppendLine("ROLE");
@@ -56,6 +57,13 @@ public static class DemonTarotPrompts
         sb.AppendLine("- Do not invent replacement props that **fill the same comic slot** (e.g. swapping \"grizzly\" for another beast still paints a caption). Stay faithful to the **three named themes** from lines 1–3 as **spoken forces** (Greed, Vanity, Chaos, Power) — not as booth checklists.");
         sb.AppendLine("- If any image feels like illustration for a joke title, delete it.");
         sb.AppendLine();
+        FortuneClientWealthContext.AppendClientBlock(sb, clientWealth);
+        sb.AppendLine("WEALTH IN THE CURSE (spirit only — abstract, no prop names):");
+        if (clientWealth == FortuneClientSpawner.WealthType.Rich)
+            sb.AppendLine("- The querent sits in **privilege**. Twist **Greed/Vanity/Power** as rot beneath gilded habit — excess, entitlement, inheritance that spoils — never name hats, barrels, or scene props.");
+        else
+            sb.AppendLine("- The querent sits in **scrape**. Twist the themes as cruelty that lands on **thin purse and worn dignity** — hunger, shame, survival — never name hats, barrels, or scene props.");
+        sb.AppendLine();
         sb.AppendLine("RULES");
         sb.AppendLine("- Do not copy or paste title text from the private lines.");
         sb.AppendLine("- Do not say \"the cards\", \"the spread\", or \"first/second/third card\".");
@@ -81,7 +89,7 @@ public static class DemonTarotPrompts
         }
         AppendOutputLengthContract(sb, fortuneTellerReadingForBrevity);
         AppendExplicitThemeNamingContract(sb, cards);
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards);
+        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
         AppendThemeLaneCoverageChecklist(sb, cards);
         AppendLexicalAnchorPools(sb, cards);
         return sb.ToString();
@@ -269,7 +277,9 @@ public static class DemonTarotPrompts
     }
 
     /// <summary>Pass 1 — short JSON only; parsed by <see cref="DemonReadingOutlineParser"/> then fed into <see cref="BuildReadingSecondPassProsePrompt"/>.</summary>
-    public static string BuildReadingOutlinePrompt(IReadOnlyList<TarotCardData> cards)
+    public static string BuildReadingOutlinePrompt(
+        IReadOnlyList<TarotCardData> cards,
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
     {
         var sb = new StringBuilder();
         sb.AppendLine("You are the carnival demon planning a three-line curse. PASS 1 — OUTLINE ONLY.");
@@ -282,7 +292,7 @@ public static class DemonTarotPrompts
         sb.AppendLine("- anchor_1 and anchor_2: one English word each (or one hyphenated pair like hunger-for); no sentences.");
         sb.AppendLine("- sentence5_moral_read_hint: ≤12 words, cruel, not comforting.");
         sb.AppendLine();
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards);
+        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
         AppendThemeLaneCoverageChecklist(sb, cards);
         AppendLexicalAnchorPools(sb, cards);
         return sb.ToString();
@@ -294,7 +304,8 @@ public static class DemonTarotPrompts
         IReadOnlyList<TarotCardData> cards,
         string outlineCanonicalJson,
         string additionalDemonInstructions,
-        string fortuneTellerReadingForBrevity = null)
+        string fortuneTellerReadingForBrevity = null,
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
     {
         var sb = new StringBuilder();
         sb.AppendLine("ROLE");
@@ -311,6 +322,7 @@ public static class DemonTarotPrompts
         sb.AppendLine("- **Obey the WORD BUDGET block** below exactly (same five-sentence contract as single-pass).");
         sb.AppendLine("- **Spirit never comforts:** no earnest healing, redemption, beacon of hope, therapy tone.");
         sb.AppendLine();
+        FortuneClientWealthContext.AppendClientBlock(sb, clientWealth);
         sb.AppendLine("STRICT — NO CAPTION PROPS from private titles (no animals-as-joke, foods, brands, rooms from the title lines). Abstract laws and hungers only.");
         sb.AppendLine("- You **must** speak **Greed**, **Vanity**, **Chaos**, and **Power** exactly where **NAMED THEMES** lists — spelled as proper nouns.");
         sb.AppendLine();
@@ -322,7 +334,7 @@ public static class DemonTarotPrompts
         }
         AppendOutputLengthContract(sb, fortuneTellerReadingForBrevity);
         AppendExplicitThemeNamingContract(sb, cards);
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards);
+        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
         AppendThemeLaneCoverageChecklist(sb, cards);
         AppendLexicalAnchorPools(sb, cards);
         return sb.ToString();

@@ -15,7 +15,8 @@ public static class DemonTarotTwoPass
         string additionalDemonInstructions,
         Action<string> onSuccess,
         Action<string> onError,
-        string fortuneTellerReadingForBrevity = null)
+        string fortuneTellerReadingForBrevity = null,
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
     {
         if (ollama == null)
         {
@@ -26,7 +27,7 @@ public static class DemonTarotTwoPass
         if (!twoPass || cards == null || cards.Count == 0)
         {
             yield return ollama.StartCoroutine(ollama.GenerateWait(
-                DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions, fortuneTellerReadingForBrevity),
+                DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions, fortuneTellerReadingForBrevity, clientWealth),
                 onSuccess,
                 onError));
             yield break;
@@ -35,7 +36,7 @@ public static class DemonTarotTwoPass
         string outlineRaw = null;
         string err1 = null;
         yield return ollama.StartCoroutine(ollama.GenerateWait(
-            DemonTarotPrompts.BuildReadingOutlinePrompt(cards),
+            DemonTarotPrompts.BuildReadingOutlinePrompt(cards, clientWealth),
             s => outlineRaw = s,
             e => err1 = e));
 
@@ -62,7 +63,7 @@ public static class DemonTarotTwoPass
                 "[DemonTwoPass] Outline parse failed (" + parseFail + "); falling back to single-pass demon prompt. Raw (trimmed): " +
                 TrimForLog(outlineRaw));
             yield return ollama.StartCoroutine(ollama.GenerateWait(
-                DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions, fortuneTellerReadingForBrevity),
+                DemonTarotPrompts.BuildReadingPrompt(cards, additionalDemonInstructions, fortuneTellerReadingForBrevity, clientWealth),
                 onSuccess,
                 onError));
             yield break;
@@ -70,7 +71,7 @@ public static class DemonTarotTwoPass
 
         string outlineJson = JsonUtility.ToJson(parsed);
         string prosePrompt = DemonTarotPrompts.BuildReadingSecondPassProsePrompt(
-            cards, outlineJson, additionalDemonInstructions, fortuneTellerReadingForBrevity);
+            cards, outlineJson, additionalDemonInstructions, fortuneTellerReadingForBrevity, clientWealth);
         yield return ollama.StartCoroutine(ollama.GenerateWait(prosePrompt, onSuccess, onError));
     }
 

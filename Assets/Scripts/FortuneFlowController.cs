@@ -46,7 +46,7 @@ public class FortuneFlowController : MonoBehaviour
     [Tooltip("If set, assigned to the TMP_InputField placeholder so players know to close with themes + moral lean twisted toward hope.")]
     [SerializeField, TextArea(3, 10)]
     private string playerFortuneClosingPlaceholderHint =
-        "Close with one sentence tying the three card moods together and whether they lean kind, severe, or cruel toward the listener — resolve into hope or mercy (do not paste card titles).";
+        "Echo each card's vignette loosely (image/verb, not the title), name Greed/Vanity/Chaos/Power per card, twist moral lean toward hope — and speak to whether the customer is wealthy or poor.";
 
     [Tooltip("All user-visible strings for this flow. Leave formats empty to skip that write.")]
     [SerializeField] private FortuneFlowOutputStrings outputStrings = new FortuneFlowOutputStrings();
@@ -141,6 +141,8 @@ public class FortuneFlowController : MonoBehaviour
             cardPull.onCardPullComplete.AddListener(OnCardPullComplete);
         if (spiritReader != null)
             spiritReader.onResponseText.AddListener(OnSpiritResponseText);
+        if (spiritReader != null && clientSpawner != null)
+            spiritReader.BindClientSpawner(clientSpawner);
     }
 
     void OnSpiritResponseText(string text)
@@ -342,7 +344,8 @@ public class FortuneFlowController : MonoBehaviour
         }
 
         float energy = Mathf.Clamp(_committedMagicalEnergyForDuel, 0f, 100f);
-        FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(_spread, _playerFortuneForJudge, spirit, energy);
+        FortuneClientSpawner.WealthType wealth = ResolveClientWealth();
+        FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(_spread, _playerFortuneForJudge, spirit, energy, wealth);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energy);
         bool playerWon;
         if (guaranteed)
@@ -405,7 +408,7 @@ public class FortuneFlowController : MonoBehaviour
         WriteTmp(judgeOutput, ResolvedJudgeThinkingMessage(), nameof(FortuneFlowController));
 
         string prompt = JudgeVerdictProsePrompts.BuildProsePrompt(
-            _spread, duel, playerWon, guaranteed, energy, explanation, playerFortune, spiritText);
+            _spread, duel, playerWon, guaranteed, energy, explanation, playerFortune, spiritText, duel.ClientWealth);
 
         string prose = null;
         string err = null;
@@ -700,6 +703,9 @@ public class FortuneFlowController : MonoBehaviour
         if (!string.IsNullOrEmpty(message))
             Debug.Log("[FortuneFlow] " + message);
     }
+
+    FortuneClientSpawner.WealthType ResolveClientWealth() =>
+        clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor;
 
     void ApplyPlayerFortunePlaceholderHint()
     {

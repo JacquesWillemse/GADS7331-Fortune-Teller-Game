@@ -5,8 +5,8 @@ using UnityEngine;
 
 /// <summary>
 /// Rule-based duel totals: magic power (player), per-card moral tilt from **printed** card leans (Good/Neutral/Bad),
-/// per-card theme identification (abstract lane lexicon — avoids absurd card-caption bingo), hope-vs-harm alignment,
-/// moral spread judge bias, and a small **all-Neutral draw** bonus when the teller shows real hope (see <see cref="FormatRationale"/>).
+/// per-card theme identification (abstract lane lexicon), loose vignette echo from card descriptions,
+/// customer wealth fit, hope-vs-harm alignment, moral spread judge bias, and a small **all-Neutral draw** bonus.
 /// Energy 0–100 adds player bonus; 100 = automatic teller win.
 /// </summary>
 public static class FortuneDuelRubric
@@ -18,6 +18,8 @@ public static class FortuneDuelRubric
     public const int MagicalEnergyMaxBonusPoints = 50;
     /// <summary>Ceiling per card for theme weave; curve saturates below old 10 to reduce thesaurus-padding wins.</summary>
     public const int MaxThemeIdentificationPerCard = 8;
+    /// <summary>Ceiling per card for loose vignette echo (keywords from card description).</summary>
+    public const int MaxDescriptionEchoPerCard = 6;
     public const int MaxAlignment = 20;
     /// <summary>When every drawn card is Neutral and the teller shows enough hope-language, the booth steadies the goodwill.</summary>
     public const int NeutralSpreadTellerBonus = 4;
@@ -67,13 +69,25 @@ public static class FortuneDuelRubric
         "darkness", "succumb", "excess", "corruption"
     };
 
+    static readonly HashSet<string> DescriptionStopWords = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+    {
+        "like", "the", "a", "an", "with", "for", "into", "after", "you", "your", "act", "that", "this", "from",
+        "and", "or", "but", "in", "on", "at", "to", "of", "is", "are", "was", "were", "be", "has", "have", "had",
+        "do", "does", "did", "will", "would", "could", "should", "can", "may", "might", "must", "not", "no", "so",
+        "if", "as", "it", "its", "one", "two", "three", "all", "any", "each", "every", "some", "such", "than",
+        "then", "when", "where", "who", "what", "how", "why", "about", "upon", "over", "under", "out", "up", "down",
+        "piece", "very", "just", "only", "also", "still", "even", "much", "many", "more", "most", "less", "least"
+    };
+
     /// <summary>Computes both sides' totals from spread data and the two readings. Moral card tilt uses printed leans; theme/alignment use reading text (include spirit's full reply, e.g. overall moral read sentence).</summary>
     /// <param name="magicalEnergy0to100">0–100 from UI; adds up to <see cref="MagicalEnergyMaxBonusPoints"/> to the player; 100 = guaranteed win (see <see cref="IsGuaranteedPlayerWin"/>).</param>
+    /// <param name="clientWealth">Wealth of the seated customer — wealth-fit tokens scored on both readings.</param>
     public static FortuneDuelScoreBreakdown Compute(
         IReadOnlyList<TarotCardData> spread,
         string playerReading,
         string demonReading,
-        float magicalEnergy0to100)
+        float magicalEnergy0to100,
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
     {
         string pNorm = NormalizeCorpus(playerReading);
         string dNorm = NormalizeCorpus(demonReading);
@@ -86,6 +100,8 @@ public static class FortuneDuelRubric
         int dMoral = 0;
         int pTheme = 0;
         int dTheme = 0;
+        int pDesc = 0;
+        int dDesc = 0;
 
         for (int i = 0; i < spread.Count; i++)
         {
@@ -102,19 +118,24 @@ public static class FortuneDuelRubric
 
             pTheme += ThemeIdentificationForReading(pNorm, c.cardTheme);
             dTheme += ThemeIdentificationForReading(dNorm, c.cardTheme);
+            pDesc += DescriptionEchoForReading(pNorm, c);
+            dDesc += DescriptionEchoForReading(dNorm, c);
         }
 
         int pAlign = AlignmentForPlayer(pNorm);
         int dAlign = AlignmentForDemon(dNorm);
+        int pWealth = FortuneClientWealthContext.ScoreWealthFitForPlayer(pNorm, clientWealth);
+        int dWealth = FortuneClientWealthContext.ScoreWealthFitForDemon(dNorm, clientWealth);
 
         MoralSpreadJudgeBias(spread, out int pJudgeBias, out int dJudgeBias);
 
         int neutralBonus = ComputeNeutralSpreadTellerBonus(spread, pNorm);
-        int pTotal = magic + pMoral + pTheme + pAlign + pJudgeBias + neutralBonus;
-        int dTotal = dMoral + dTheme + dAlign + dJudgeBias;
+        int pTotal = magic + pMoral + pTheme + pDesc + pWealth + pAlign + pJudgeBias + neutralBonus;
+        int dTotal = dMoral + dTheme + dDesc + dWealth + dAlign + dJudgeBias;
 
         return new FortuneDuelScoreBreakdown(
-            magic, pMoral, dMoral, pTheme, dTheme, pAlign, dAlign, pJudgeBias, dJudgeBias, neutralBonus, pTotal, dTotal);
+            magic, pMoral, dMoral, pTheme, dTheme, pDesc, dDesc, pWealth, dWealth,
+            pAlign, dAlign, pJudgeBias, dJudgeBias, neutralBonus, pTotal, dTotal, clientWealth);
     }
 
     /// <summary>All drawn lines Neutral + teller shows real hope → small booth bonus so neutral spreads are not pure token DPS races.</summary>
@@ -173,7 +194,8 @@ public static class FortuneDuelRubric
         sb.AppendLine($"Magical bonus on player total (0–{MagicalEnergyMaxBonusPoints} from energy): +{s.PlayerMagicPower}");
         sb.AppendLine($"Moral tilt from drawn cards: player +{s.PlayerMoralFromCards} (Good +{MoralCardBonus} each), spirit +{s.DemonMoralFromCards} (Bad +{MoralCardBonus} each), Neutral +0.");
         sb.AppendLine("Morality layers — (1) **Card values:** each line's printed moral lean (Good / Neutral / Bad) feeds the tilt above and the spread judge bias below; those counts are fixed from data.");
-        sb.AppendLine("(2) **Interpretation:** the teller and spirit passages are scored separately for theme weave and hope-vs-harm alignment from their wording. The spirit's closing **overall moral read** of the draw (prose) is **additive** color for the booth judge: it must not replace or override the printed leans, but helps read intent alongside them.");
+        sb.AppendLine("(2) **Interpretation:** the teller and spirit passages are scored separately for theme weave, **loose vignette echo** (keywords from each card's description), **customer wealth fit**, and hope-vs-harm alignment from their wording. The spirit's closing **overall moral read** of the draw (prose) is **additive** color for the booth judge: it must not replace or override the printed leans, but helps read intent alongside them.");
+        sb.Append("- Customer wealth for this round: **").Append(FortuneClientWealthContext.LabelFor(s.ClientWealth)).AppendLine("**.");
         if (s.PlayerSpreadMoralJudgeBias > 0)
             sb.AppendLine($"Moral judge bias (more Good than Bad on the draw): +{s.PlayerSpreadMoralJudgeBias} to teller.");
         if (s.DemonSpreadMoralJudgeBias > 0)
@@ -181,6 +203,8 @@ public static class FortuneDuelRubric
         if (s.PlayerNeutralSpreadBonus > 0)
             sb.AppendLine($"Neutral-draw booth steadiness (teller hope, all Neutral lines): +{s.PlayerNeutralSpreadBonus} to teller.");
         sb.AppendLine($"Theme identification (per card, max {MaxThemeIdentificationPerCard} each; abstract lane lexicon): player +{s.PlayerThemeIdentification}, spirit +{s.DemonThemeIdentification}.");
+        sb.AppendLine($"Vignette echo (per card, max {MaxDescriptionEchoPerCard} each; loose keywords from card descriptions): player +{s.PlayerDescriptionEcho}, spirit +{s.DemonDescriptionEcho}.");
+        sb.AppendLine($"Customer wealth fit (max {FortuneClientWealthContext.MaxWealthFit} each): player +{s.PlayerWealthFit}, spirit +{s.DemonWealthFit}.");
         sb.AppendLine($"Fortune alignment (help-lane vs harm-lane, max {MaxAlignment} each): player +{s.PlayerAlignment}, spirit +{s.DemonAlignment}.");
         sb.AppendLine($"Totals — player {s.PlayerTotal}, spirit {s.DemonTotal}.");
         return sb.ToString().TrimEnd();
@@ -210,9 +234,9 @@ public static class FortuneDuelRubric
 
         int diff = Mathf.Abs(s.PlayerTotal - s.DemonTotal);
         if (playerWon)
-            return $"The teller leads the spirit by {diff} point{(diff == 1 ? "" : "s")}, weaving hope and the draw more tightly than the curse.";
+            return $"The teller leads the spirit by {diff} point{(diff == 1 ? "" : "s")}, weaving hope, the draw's vignettes, and the customer's station more tightly than the curse.";
 
-        return $"The spirit leads the teller by {diff} point{(diff == 1 ? "" : "s")}, sinking dread and the drawn themes deeper than the hopeful lines.";
+        return $"The spirit leads the teller by {diff} point{(diff == 1 ? "" : "s")}, sinking dread, the drawn themes, and the customer's station deeper than the hopeful lines.";
     }
 
     static string NormalizeCorpus(string s)
@@ -220,6 +244,62 @@ public static class FortuneDuelRubric
         if (string.IsNullOrEmpty(s))
             return "";
         return Regex.Replace(s.ToLowerInvariant(), @"[^a-z0-9\s-]", " ");
+    }
+
+    static int DescriptionEchoForReading(string corpusNorm, TarotCardData card)
+    {
+        if (string.IsNullOrEmpty(corpusNorm) || card == null)
+            return 0;
+        string[] tokens = EchoTokensFromDescription(card.GetCardDescription());
+        if (tokens == null || tokens.Length == 0)
+            return 0;
+        int hits = CountBoundaryHits(corpusNorm, tokens);
+        if (hits <= 0)
+            return 0;
+        if (hits == 1)
+            return 2;
+        if (hits == 2)
+            return 4;
+        return MaxDescriptionEchoPerCard;
+    }
+
+    static string[] EchoTokensFromDescription(string description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return System.Array.Empty<string>();
+
+        var list = new List<string>();
+        var seen = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        string norm = NormalizeCorpus(description);
+        string[] parts = norm.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string w = parts[i].Trim('-');
+            if (w.Length < 3 || DescriptionStopWords.Contains(w))
+                continue;
+            if (seen.Add(w))
+                list.Add(w);
+        }
+
+        // Hyphenated compounds in the original (e.g. deep-fry) also contribute split parts.
+        string[] rawWords = Regex.Split(description.ToLowerInvariant(), @"[^a-z0-9\-]+");
+        for (int i = 0; i < rawWords.Length; i++)
+        {
+            string raw = rawWords[i];
+            if (!raw.Contains("-"))
+                continue;
+            string[] halves = raw.Split('-');
+            for (int h = 0; h < halves.Length; h++)
+            {
+                string half = halves[h].Trim();
+                if (half.Length < 3 || DescriptionStopWords.Contains(half))
+                    continue;
+                if (seen.Add(half))
+                    list.Add(half);
+            }
+        }
+
+        return list.ToArray();
     }
 
     static int ThemeIdentificationForReading(string corpusNorm, string cardTheme)
@@ -296,6 +376,10 @@ public readonly struct FortuneDuelScoreBreakdown
     public readonly int DemonMoralFromCards;
     public readonly int PlayerThemeIdentification;
     public readonly int DemonThemeIdentification;
+    public readonly int PlayerDescriptionEcho;
+    public readonly int DemonDescriptionEcho;
+    public readonly int PlayerWealthFit;
+    public readonly int DemonWealthFit;
     public readonly int PlayerAlignment;
     public readonly int DemonAlignment;
     public readonly int PlayerSpreadMoralJudgeBias;
@@ -304,6 +388,7 @@ public readonly struct FortuneDuelScoreBreakdown
     public readonly int PlayerNeutralSpreadBonus;
     public readonly int PlayerTotal;
     public readonly int DemonTotal;
+    public readonly FortuneClientSpawner.WealthType ClientWealth;
 
     public FortuneDuelScoreBreakdown(
         int playerMagicPower,
@@ -311,19 +396,28 @@ public readonly struct FortuneDuelScoreBreakdown
         int demonMoralFromCards,
         int playerThemeIdentification,
         int demonThemeIdentification,
+        int playerDescriptionEcho,
+        int demonDescriptionEcho,
+        int playerWealthFit,
+        int demonWealthFit,
         int playerAlignment,
         int demonAlignment,
         int playerSpreadMoralJudgeBias,
         int demonSpreadMoralJudgeBias,
         int playerNeutralSpreadBonus,
         int playerTotal,
-        int demonTotal)
+        int demonTotal,
+        FortuneClientSpawner.WealthType clientWealth)
     {
         PlayerMagicPower = playerMagicPower;
         PlayerMoralFromCards = playerMoralFromCards;
         DemonMoralFromCards = demonMoralFromCards;
         PlayerThemeIdentification = playerThemeIdentification;
         DemonThemeIdentification = demonThemeIdentification;
+        PlayerDescriptionEcho = playerDescriptionEcho;
+        DemonDescriptionEcho = demonDescriptionEcho;
+        PlayerWealthFit = playerWealthFit;
+        DemonWealthFit = demonWealthFit;
         PlayerAlignment = playerAlignment;
         DemonAlignment = demonAlignment;
         PlayerSpreadMoralJudgeBias = playerSpreadMoralJudgeBias;
@@ -331,5 +425,6 @@ public readonly struct FortuneDuelScoreBreakdown
         PlayerNeutralSpreadBonus = playerNeutralSpreadBonus;
         PlayerTotal = playerTotal;
         DemonTotal = demonTotal;
+        ClientWealth = clientWealth;
     }
 }

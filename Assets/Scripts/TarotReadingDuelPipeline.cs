@@ -46,6 +46,8 @@ public class TarotReadingDuelPipeline : MonoBehaviour
     [Header("Fortune duel scoring")]
     [Tooltip("Legacy dev slider: 0–10 maps to 0–100 magical energy for FortuneDuelRubric when using this pipeline directly.")]
     [SerializeField, Range(0, 10)] private int playerEnergyBonusForJudge;
+    [Tooltip("Optional — customer wealth for duel scoring and spirit prompts.")]
+    [SerializeField] private FortuneClientSpawner clientSpawner;
     [Tooltip("When totals tie, the player wins if true.")]
     [SerializeField] private bool tieRoundGoesToPlayer = true;
 
@@ -212,7 +214,8 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             additionalDemonInstructions,
             s => demonText = s,
             e => demonErr = e,
-            playerReading));
+            playerReading,
+            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor));
 
         if (!string.IsNullOrEmpty(demonErr))
         {
@@ -234,7 +237,8 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             _spread,
             playerReading,
             demonText ?? "",
-            Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f));
+            Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f),
+            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor);
 
         float energyUi = Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energyUi);

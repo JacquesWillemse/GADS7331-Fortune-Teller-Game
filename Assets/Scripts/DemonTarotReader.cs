@@ -43,6 +43,11 @@ public class DemonTarotReader : MonoBehaviour
     [Header("Prompt tuning (optional)")]
     [Tooltip("Appended to the demon prompt so you can iterate in the Inspector without code changes.")]
     [SerializeField, TextArea(3, 12)] private string additionalDemonInstructions = "";
+    [Tooltip("Optional — customer wealth for spirit prompts and duel scoring context.")]
+    [SerializeField] private FortuneClientSpawner clientSpawner;
+
+    /// <summary>Runtime bind when the flow controller owns the spawner reference.</summary>
+    public void BindClientSpawner(FortuneClientSpawner spawner) => clientSpawner = spawner;
 
     private bool _requestInFlight;
     private readonly List<TarotCardData> _spreadBuffer = new List<TarotCardData>();
@@ -67,6 +72,10 @@ public class DemonTarotReader : MonoBehaviour
             return;
         RequestFromPull();
     }
+
+    /// <summary>Wealth of the seated customer; defaults to Poor when no spawner is assigned.</summary>
+    public FortuneClientSpawner.WealthType ResolveClientWealth() =>
+        clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor;
 
     /// <summary>
     /// Builds the spread from <see cref="TarotCardPull"/> (same slice as smoke test).
@@ -158,7 +167,8 @@ public class DemonTarotReader : MonoBehaviour
                 additionalDemonInstructions,
                 s => ok = s,
                 e => err = e,
-                null));
+                null,
+                ResolveClientWealth()));
 
             if (generation != _requestGeneration)
                 yield break;
