@@ -161,6 +161,16 @@ def icon_judge(draw: ImageDraw.ImageDraw, box):
     draw.ellipse((cx - 8, ey - 6, cx + 8, ey + 6), fill=EMERALD)
 
 
+def icon_quill(draw: ImageDraw.ImageDraw, box):
+    x0, y0, x1, y1 = box
+    cx = (x0 + x1) // 2
+    cy = (y0 + y1) // 2
+    draw.line([(cx - 30, cy + 28), (cx + 26, cy - 30)], fill=GOLD, width=4)
+    draw.polygon([(cx + 26, cy - 30), (cx + 38, cy - 18), (cx + 18, cy - 18)], fill=CREAM, outline=GOLD)
+    draw.ellipse((cx - 38, cy + 10, cx - 10, cy + 38), fill=(58, 34, 20, 255), outline=GOLD, width=2)
+    draw.ellipse((cx - 8, cy - 42, cx + 8, cy - 26), fill=EMERALD)
+
+
 def icon_arrow(draw: ImageDraw.ImageDraw, box, direction: str):
     x0, y0, x1, y1 = box
     cy = (y0 + y1) // 2
@@ -186,6 +196,36 @@ def make_square_button(name: str, label: str, icon_fn):
     font = load_font(34, bold=True)
     center_text(d, label, text_box, font)
     path = OUT / f"UIBtn_{name}.png"
+    img.save(path, "PNG")
+    print(f"Wrote {path}")
+
+
+def make_action_button(name: str, label: str, icon_fn):
+    """Wide gameplay button — icon left, label right (Cards panel)."""
+    w, h = 640, 220
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    plaque = draw_button_plaque(img, (8, 8, w - 8, h - 8), radius=24)
+    d = ImageDraw.Draw(img)
+    px0, py0, px1, py1 = plaque
+    icon_box = (px0 + 20, py0 + 20, px0 + 130, py1 - 20)
+    text_box = (px0 + 140, py0 + 20, px1 - 20, py1 - 20)
+    icon_fn(d, icon_box)
+    font = load_font(36, bold=True)
+    center_text(d, label, text_box, font)
+    path = OUT / f"UIBtn_{name}.png"
+    img.save(path, "PNG")
+    print(f"Wrote {path}")
+
+
+def make_panel(name: str, w: int, h: int, title: str = None):
+    """Decorative panel frame (Cards UI backgrounds)."""
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_button_plaque(img, (6, 6, w - 6, h - 6), radius=20)
+    if title:
+        d = ImageDraw.Draw(img)
+        font = load_font(24, bold=True)
+        center_text(d, title, (20, 14, w - 20, 52), font, fill=GOLD_LIGHT)
+    path = OUT / f"UIPanel_{name}.png"
     img.save(path, "PNG")
     print(f"Wrote {path}")
 
@@ -217,6 +257,10 @@ def main():
     make_square_button("Judge", "JUDGE", icon_judge)
     make_page_button("PreviousPage", "PREVIOUS PAGE", "left")
     make_page_button("NextPage", "NEXT PAGE", "right")
+    make_action_button("DrawCards", "DRAW CARDS", icon_cards)
+    make_action_button("ReadFortune", "READ FORTUNE", icon_quill)
+    make_panel("FortuneInput", 620, 260, "YOUR READING")
+    make_panel("Energy", 320, 260, "MAGICAL ENERGY")
     print("Done — all PNGs use real alpha transparency (no checkerboard).")
 
 
