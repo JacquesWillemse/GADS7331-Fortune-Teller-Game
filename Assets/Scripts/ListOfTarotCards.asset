@@ -28,7 +28,7 @@ MonoBehaviour:
   - cardName: 'Horse shooting a farmer with a broken leg '
     cardTheme: Power
     cardMoral: 0
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 58677b095c1d491ab3bd896cf606b08d, type: 3}
   - cardName: 'Shaving a grizzly bear '
     cardTheme: Vanity
     cardMoral: 1
@@ -36,7 +36,7 @@ MonoBehaviour:
   - cardName: 20 Succulent Chinese meals for 1
     cardTheme: Greed
     cardMoral: 1
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 6719316ae5494704a1226b2dbe2623c3, type: 3}
   - cardName: Holding the Remote Control in a large family
     cardTheme: Power
     cardMoral: 1
@@ -44,4 +44,20 @@ MonoBehaviour:
   - cardName: Wishing for a cold snap in a retirement home
     cardTheme: Chaos
     cardMoral: 2
-    tarotCardImage: {fileID: 0}
+    tarotCardImage: {fileID: 21300000, guid: 84b75c4024e045efa4be33e6d5181fc9, type: 3}
+  - cardName: 'Burning a billionares boat '
+    cardTheme: Chaos
+    cardMoral: 1
+    tarotCardImage: {fileID: 21300000, guid: c6c997ad5b564c31befad805e99e1aad, type: 3}
+  - cardName: 'Drinking all the alcohol out of a angry mobs molotov cocktails '
+    cardTheme: Greed
+    cardMoral: 1
+    tarotCardImage: {fileID: 21300000, guid: 6b3b0023e4d54695a643b894b1d1eaf6, type: 3}
+  - cardName: 'Stealing hair from a salons floor for your bald head '
+    cardTheme: Vanity
+    cardMoral: 0
+    tarotCardImage: {fileID: 21300000, guid: d284f0993033414cba4022a1e5672339, type: 3}
+  - cardName: 'Dating someone who works at an abatoir for the meat '
+    cardTheme: Greed
+    cardMoral: 0
+    tarotCardImage: {fileID: 21300000, guid: 6808ddb886704bd8a7670f6d4038a12b, type: 3}
