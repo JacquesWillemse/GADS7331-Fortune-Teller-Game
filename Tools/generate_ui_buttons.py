@@ -10,7 +10,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "Assets" / "Images" / "UI"
+RES = ROOT / "Assets" / "Resources" / "UI"
 OUT.mkdir(parents=True, exist_ok=True)
+RES.mkdir(parents=True, exist_ok=True)
 
 # Theme palette
 WOOD_DARK = (42, 24, 16, 255)
@@ -205,6 +207,14 @@ def icon_energy(draw: ImageDraw.ImageDraw, box):
     )
 
 
+def icon_help(draw: ImageDraw.ImageDraw, box):
+    x0, y0, x1, y1, w, h, cx, cy, s = box_metrics(box)
+    r = int(min(w, h) * 0.36)
+    draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(58, 34, 20, 255), outline=GOLD, width=max(2, int(4 * s)))
+    font = load_font(max(18, int(r * 0.95)), bold=True)
+    draw.text((cx - int(r * 0.18), cy - int(r * 0.62)), "?", font=font, fill=GOLD_LIGHT)
+
+
 def icon_clients(draw: ImageDraw.ImageDraw, box):
     x0, y0, x1, y1, w, h, cx, cy, s = box_metrics(box)
     head_r = int(min(w, h) * 0.11)
@@ -295,6 +305,10 @@ def make_square_button(name: str, label: str, icon_fn, icon_frac: float = 0.62):
     path = OUT / f"UIBtn_{name}.png"
     img.save(path, "PNG")
     print(f"Wrote {path}")
+    if name == "Help":
+        res_path = RES / f"UIBtn_{name}.png"
+        img.save(res_path, "PNG")
+        print(f"Wrote {res_path}")
 
 
 def make_action_button(name: str, label: str, icon_fn):
@@ -312,6 +326,21 @@ def make_action_button(name: str, label: str, icon_fn):
     path = OUT / f"UIBtn_{name}.png"
     img.save(path, "PNG")
     print(f"Wrote {path}")
+
+
+def make_help_panel(name: str = "HelpPopup"):
+    w, h = 720, 820
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_button_plaque(img, (6, 6, w - 6, h - 6), radius=24)
+    d = ImageDraw.Draw(img)
+    font = load_font(30, bold=True)
+    center_text(d, "BOOTH GUIDE", (24, 16, w - 24, 72), font, fill=GOLD_LIGHT)
+    path = OUT / f"UIPanel_{name}.png"
+    img.save(path, "PNG")
+    print(f"Wrote {path}")
+    res_path = RES / f"UIPanel_{name}.png"
+    img.save(res_path, "PNG")
+    print(f"Wrote {res_path}")
 
 
 def make_hud_bar(name: str = "Bar"):
@@ -384,6 +413,8 @@ def main():
     make_hud_bar("Bar")
     make_icon_sprite("Energy", icon_energy)
     make_icon_sprite("Clients", icon_clients)
+    make_square_button("Help", "HELP", icon_help, icon_frac=0.58)
+    make_help_panel("HelpPopup")
     print("Done — all PNGs use real alpha transparency (no checkerboard).")
 
 
