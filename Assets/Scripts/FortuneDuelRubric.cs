@@ -366,6 +366,14 @@ public static class FortuneDuelRubric
         int hope = CountBoundaryHits(corpusNorm, HopeHelpTokens);
         return Mathf.Clamp(doom * 5 - hope * 4, 0, MaxAlignment);
     }
+
+    /// <summary>True when the reading names at least one theme lexicon word for this card's lane.</summary>
+    public static bool PlayerIdentifiedCardTheme(string playerReading, TarotCardData card)
+    {
+        if (card == null || string.IsNullOrWhiteSpace(playerReading))
+            return false;
+        return ThemeIdentificationForReading(NormalizeCorpus(playerReading), card.cardTheme) > 0;
+    }
 }
 
 /// <summary>Point breakdown for <see cref="FortuneDuelRubric.Compute"/>.</summary>

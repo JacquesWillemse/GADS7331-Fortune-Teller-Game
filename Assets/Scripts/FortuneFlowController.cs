@@ -26,6 +26,7 @@ public class FortuneFlowController : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [Tooltip("When set, Draw Cards and the fortune flow stay locked until Call Client In finishes.")]
     [SerializeField] private FortuneClientSpawner clientSpawner;
+    [SerializeField] private WisdomBookProgress wisdomBookProgress;
     [SerializeField] private DemonTarotReader spiritReader;
     [Tooltip("Same OllamaClient as the spirit reader. If empty, uses spiritReader.Ollama when available.")]
     [SerializeField] private OllamaClient ollama;
@@ -244,6 +245,7 @@ public class FortuneFlowController : MonoBehaviour
         WriteTmp(playerFortuneOutput, t, nameof(FortuneFlowController));
         if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorPlayerOnReadFormat))
             WriteTmp(judgeOutput, SafeFormat(outputStrings.judgeMirrorPlayerOnReadFormat, t), nameof(FortuneFlowController));
+        wisdomBookProgress?.TryUnlockFromReading(_spread, t);
         LogFlow(outputStrings != null ? outputStrings.logAfterReadFortune : null);
         RefreshGameplayInteractables();
     }

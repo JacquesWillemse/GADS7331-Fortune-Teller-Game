@@ -4676,6 +4676,7 @@ MonoBehaviour:
   cardPull: {fileID: 836697964}
   gameManager: {fileID: 836697967}
   clientSpawner: {fileID: 836697968}
+  wisdomBookProgress: {fileID: 1696333505}
   spiritReader: {fileID: 17155972}
   ollama: {fileID: 17155970}
   playerFortuneInput: {fileID: 971798968}
@@ -4737,6 +4738,7 @@ MonoBehaviour:
   largeWinMarginPoints: 12
   bonusEnergyOnLargeWin: 5
   fortuneFlow: {fileID: 836697966}
+  wisdomBookProgress: {fileID: 1696333505}
   energyCountText: {fileID: 65779116}
   customersCountText: {fileID: 1810437571}
   energyUpdate: {fileID: 753286847}
@@ -8742,6 +8744,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1696333503}
   - component: {fileID: 1696333504}
+  - component: {fileID: 1696333505}
   m_Layer: 0
   m_Name: Book
   m_TagString: Untagged
@@ -8783,12 +8786,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BookManager
   bookPages: {fileID: 11400000, guid: 80ed2898cc875b047a1e48bbe3c2c1f1, type: 2}
+  tarotDatabase: {fileID: 11400000, guid: a3a66f874861ba947b68332a265aacdb, type: 2}
+  wisdomBookProgress: {fileID: 1696333505}
   leftPageTitle: {fileID: 631837705}
   leftPageBody: {fileID: 1367606038}
   rightPageTitle: {fileID: 1054932289}
   rightPageBody: {fileID: 2040743708}
+  cardImageAnchor: {fileID: 1497515879}
   previousPage: {fileID: 1413726067}
   nextPage: {fileID: 469426707}
+  tarotCardBorderTexture: {fileID: 2800000, guid: 84749d4b38baa7546a5fe7853394c97f, type: 3}
+--- !u!114 &1696333505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1696333502}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cc2c74b28214c5291a5df312911a8b8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WisdomBookProgress
+  tarotDatabase: {fileID: 11400000, guid: a3a66f874861ba947b68332a265aacdb, type: 2}
+  onCardRevealed:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1708322961
 GameObject:
   m_ObjectHideFlags: 0

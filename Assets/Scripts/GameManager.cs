@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private FortuneFlowController fortuneFlow;
+    [SerializeField] private WisdomBookProgress wisdomBookProgress;
 
     [Header("Optional UI")]
     [Tooltip("HUD label for current run energy (0–100), not the duel slider.")]
@@ -74,6 +75,7 @@ public class GameManager : MonoBehaviour
         _customers = Mathf.Max(0, startingCustomers);
         _cardsDrawn = false;
         _gameComplete = false;
+        wisdomBookProgress?.ResetProgress();
         RaiseResources();
     }
 
