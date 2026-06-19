@@ -127,8 +127,9 @@ public class FortuneClientSpawner : MonoBehaviour
 
     IEnumerator SpawnClientAfterCameraReady()
     {
-        // Wait one frame so CameraManager can enable the tent camera first.
         yield return null;
+        while (!RunExperienceConfig.IsConfigured)
+            yield return null;
         SpawnClient();
     }
 

@@ -347,7 +347,8 @@ public class FortuneFlowController : MonoBehaviour
 
         float energy = Mathf.Clamp(_committedMagicalEnergyForDuel, 0f, 100f);
         FortuneClientSpawner.WealthType wealth = ResolveClientWealth();
-        FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(_spread, _playerFortuneForJudge, spirit, energy, wealth);
+        FortuneDuelScoreBreakdown duel = FortuneDuelRubric.Compute(
+            _spread, _playerFortuneForJudge, spirit, energy, wealth, RunExperienceConfig.PlayerJudgeBiasPoints);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energy);
         bool playerWon;
         if (guaranteed)

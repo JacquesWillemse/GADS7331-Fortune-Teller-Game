@@ -29,10 +29,16 @@ MonoBehaviour:
     pageWriting: "Earn more <b>favor</b> than the spirit. Each card hides a <b>theme</b>
       (Greed, Vanity, Chaos, Power), a <b>moral</b> sticker (Good, Neutral, Bad),
       and a funny <b>vignette</b>. The booth scores your words for theme weave, loose
-      echo of each vignette, and fit to the customer\u2019s wealth.\n\n<b>Before you
-      submit a reading:</b>\n1. Glance morals \u2014 Good cards help you; Bad cards
-      help the spirit; all Neutral means your speech carries the round.\n2. Glance
-      the magic meter \u2014 at FULL you win instantly.\n3. <b>Observe the customer\u2019s
+      echo of each vignette, and fit to the customer\u2019s wealth.\n\n<b>Lineage (run
+      start):</b> When the tent opens you declare how much fortune-telling lore you
+      still carry. That choice steers judge favor, starting energy, Book unlocks, and
+      how much the spirit knows about each pasteboard.\n\n<b>Before you submit a reading:</b>\n1.
+      Glance morals \u2014 Good cards help you; Bad cards help the spirit; all Neutral
+      means your speech carries the round.\n2. Glance the magic meter \u2014 at FULL
+      you win instantly."
+    pageImage: {fileID: 0}
+  - pageHeading: QUICK START GUIDE
+    pageWriting: "<b>Before you submit (continued):</b>\n3. <b>Observe the customer\u2019s
       wealth</b> \u2014 study whoever waits at the tent door (or sits at your table
       after you call them in). Each patron wears one to three visual clues. <b>Rich</b>
       clues: top hat, monocle, fine suit. <b>Poor</b> clues: barrel, patched hat,
@@ -41,7 +47,12 @@ MonoBehaviour:
       the booth scores wealth-fit, not a costume checklist.\n4. Line up theme echoes
       in draw order (one theme batch per card).\n5. Echo each vignette loosely (image
       and appetite, not the title pasted).\n6. Stack hope words; keep harsh words out
-      of your mouth.\n\n<b>Book of Wisdom:</b> From page three onward, each pasteboard
-      has its own page. They start <b>locked</b> \u2014 draw a card in the tent and
-      name its theme in a reading to reveal its portrait, morality, and lore here."
+      of your mouth."
+    pageImage: {fileID: 0}
+  - pageHeading: BOOK OF WISDOM
+    pageWriting: "From the next spread onward, each pasteboard has its own page in
+      this book.\n\nThey start <b>locked</b> \u2014 draw a card in the tent and name
+      its <b>theme</b> in a reading to reveal its portrait, morality, and full lore
+      here.\n\nYour opening <b>lineage</b> choice may reveal several pages immediately;
+      the rest unlock as you play."
     pageImage: {fileID: 0}

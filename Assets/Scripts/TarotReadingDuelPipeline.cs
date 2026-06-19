@@ -215,7 +215,8 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             s => demonText = s,
             e => demonErr = e,
             playerReading,
-            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor));
+            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor,
+            RunExperienceConfig.SpiritKnowledge));
 
         if (!string.IsNullOrEmpty(demonErr))
         {
@@ -238,7 +239,8 @@ public class TarotReadingDuelPipeline : MonoBehaviour
             playerReading,
             demonText ?? "",
             Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f),
-            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor);
+            clientSpawner != null ? clientSpawner.CurrentWealth : FortuneClientSpawner.WealthType.Poor,
+            RunExperienceConfig.PlayerJudgeBiasPoints);
 
         float energyUi = Mathf.Clamp(playerEnergyBonusForJudge * 10f, 0f, 100f);
         bool guaranteed = FortuneDuelRubric.IsGuaranteedPlayerWin(energyUi);

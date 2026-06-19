@@ -11,7 +11,8 @@ public static class DemonTarotPrompts
         IReadOnlyList<TarotCardData> cards,
         string additionalDemonInstructions,
         string fortuneTellerReadingForBrevity = null,
-        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge = RunExperienceConfig.SpiritCardKnowledge.Full)
     {
         var sb = new StringBuilder();
         sb.AppendLine("ROLE");
@@ -88,10 +89,10 @@ public static class DemonTarotPrompts
             sb.AppendLine();
         }
         AppendOutputLengthContract(sb, fortuneTellerReadingForBrevity);
-        AppendExplicitThemeNamingContract(sb, cards);
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
-        AppendThemeLaneCoverageChecklist(sb, cards);
-        AppendLexicalAnchorPools(sb, cards);
+        AppendExplicitThemeNamingContract(sb, cards, spiritKnowledge);
+        TarotLlmSpreadContext.AppendSpreadLinesForSpirit(sb, cards, clientWealth, spiritKnowledge);
+        AppendThemeLaneCoverageChecklist(sb, cards, spiritKnowledge);
+        AppendLexicalAnchorPools(sb, cards, spiritKnowledge);
         return sb.ToString();
     }
 
@@ -110,10 +111,22 @@ public static class DemonTarotPrompts
         return "Greed";
     }
 
-    static void AppendExplicitThemeNamingContract(StringBuilder sb, IReadOnlyList<TarotCardData> cards)
+    static void AppendExplicitThemeNamingContract(
+        StringBuilder sb,
+        IReadOnlyList<TarotCardData> cards,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge)
     {
         if (cards == null || cards.Count == 0)
             return;
+
+        if (spiritKnowledge == RunExperienceConfig.SpiritCardKnowledge.VignettesOnly)
+        {
+            sb.AppendLine("NAMED THEMES (relaxed — you were not taught the lanes):");
+            sb.AppendLine("- Do **not** force **Greed**, **Vanity**, **Chaos**, or **Power** unless you infer them from a vignette.");
+            sb.AppendLine("- Prefer abstract hunger, mirror, storm, and yoke language over claiming a carnival proper noun.");
+            sb.AppendLine();
+            return;
+        }
 
         int n = cards.Count > 3 ? 3 : cards.Count;
         string w1 = ThemeProperNounForCard(cards[0]);
@@ -209,7 +222,10 @@ public static class DemonTarotPrompts
         return "unlabeled lane — still bind to hunger-and-excess, mirror-and-ego, disorder-and-chance, or weight-and-command by context";
     }
 
-    static void AppendThemeLaneCoverageChecklist(StringBuilder sb, IReadOnlyList<TarotCardData> cards)
+    static void AppendThemeLaneCoverageChecklist(
+        StringBuilder sb,
+        IReadOnlyList<TarotCardData> cards,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge)
     {
         if (cards == null || cards.Count == 0)
             return;
@@ -219,24 +235,44 @@ public static class DemonTarotPrompts
         for (int i = 0; i < n; i++)
         {
             TarotCardData c = cards[i];
-            sb.Append("- Line ").Append(i + 1).Append(" → internal theme: ").Append(ThemeLanePublicName(c.cardTheme));
-            sb.Append(" | internal lean: ").AppendLine(c.cardMoral.ToString());
+            sb.Append("- Line ").Append(i + 1).Append(" → internal theme: ");
+            if (spiritKnowledge == RunExperienceConfig.SpiritCardKnowledge.VignettesOnly)
+                sb.Append("unknown (infer from vignette only)");
+            else
+                sb.Append(ThemeLanePublicName(c.cardTheme));
+            sb.Append(" | internal lean: ");
+            if (spiritKnowledge == RunExperienceConfig.SpiritCardKnowledge.Full)
+                sb.AppendLine(c.cardMoral.ToString());
+            else
+                sb.AppendLine("unknown");
         }
 
         sb.AppendLine("SENTENCE 4 COVERAGE (author only — satisfy in speech, do not paste): interweave the same three theme forces as lines 1–3; if one force repeats on two lines, show it **twinned** from two moral angles. No hyphenated lane headers in the output.");
-        sb.AppendLine("COVERAGE: Sentence 5 = interpretive net moral verdict — cruel demon read only; not a tally of leans.");
+        if (spiritKnowledge == RunExperienceConfig.SpiritCardKnowledge.Full)
+            sb.AppendLine("COVERAGE: Sentence 5 = interpretive net moral verdict — cruel demon read only; not a tally of leans.");
+        else
+            sb.AppendLine("COVERAGE: Sentence 5 = cruel verdict from themes/vignettes you can see — do not cite hidden moral leans.");
     }
 
-    static void AppendLexicalAnchorPools(StringBuilder sb, IReadOnlyList<TarotCardData> cards)
+    static void AppendLexicalAnchorPools(
+        StringBuilder sb,
+        IReadOnlyList<TarotCardData> cards,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge)
     {
         if (cards == null || cards.Count == 0)
             return;
 
         int n = cards.Count > 3 ? 3 : cards.Count;
         sb.AppendLine("LEXICAL POOLS (author only — weave into speech; never print this heading or \"pool\" in the curse):");
+        const string GenericPool =
+            "hunger, maw, glut, glass, mirror, dice, hazard, yoke, rank, command, decree, law, storm, feast, mask, weight, chance, fray, appetite, collar";
         for (int i = 0; i < n; i++)
         {
-            sb.Append("- Sentence ").Append(i + 1).Append(" — draw **≥2** words from: ").AppendLine(LexPoolForTheme(cards[i].cardTheme));
+            sb.Append("- Sentence ").Append(i + 1).Append(" — draw **≥2** words from: ");
+            if (spiritKnowledge == RunExperienceConfig.SpiritCardKnowledge.VignettesOnly)
+                sb.AppendLine(GenericPool);
+            else
+                sb.AppendLine(LexPoolForTheme(cards[i].cardTheme));
         }
 
         sb.AppendLine("- Sentence 4 must still audibly hit each line's family using words from those pools (synonyms allowed if clearly the same family).");
@@ -279,7 +315,8 @@ public static class DemonTarotPrompts
     /// <summary>Pass 1 — short JSON only; parsed by <see cref="DemonReadingOutlineParser"/> then fed into <see cref="BuildReadingSecondPassProsePrompt"/>.</summary>
     public static string BuildReadingOutlinePrompt(
         IReadOnlyList<TarotCardData> cards,
-        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge = RunExperienceConfig.SpiritCardKnowledge.Full)
     {
         var sb = new StringBuilder();
         sb.AppendLine("You are the carnival demon planning a three-line curse. PASS 1 — OUTLINE ONLY.");
@@ -292,9 +329,9 @@ public static class DemonTarotPrompts
         sb.AppendLine("- anchor_1 and anchor_2: one English word each (or one hyphenated pair like hunger-for); no sentences.");
         sb.AppendLine("- sentence5_moral_read_hint: ≤12 words, cruel, not comforting.");
         sb.AppendLine();
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
-        AppendThemeLaneCoverageChecklist(sb, cards);
-        AppendLexicalAnchorPools(sb, cards);
+        TarotLlmSpreadContext.AppendSpreadLinesForSpirit(sb, cards, clientWealth, spiritKnowledge);
+        AppendThemeLaneCoverageChecklist(sb, cards, spiritKnowledge);
+        AppendLexicalAnchorPools(sb, cards, spiritKnowledge);
         return sb.ToString();
     }
 
@@ -305,7 +342,8 @@ public static class DemonTarotPrompts
         string outlineCanonicalJson,
         string additionalDemonInstructions,
         string fortuneTellerReadingForBrevity = null,
-        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor,
+        RunExperienceConfig.SpiritCardKnowledge spiritKnowledge = RunExperienceConfig.SpiritCardKnowledge.Full)
     {
         var sb = new StringBuilder();
         sb.AppendLine("ROLE");
@@ -333,10 +371,10 @@ public static class DemonTarotPrompts
             sb.AppendLine();
         }
         AppendOutputLengthContract(sb, fortuneTellerReadingForBrevity);
-        AppendExplicitThemeNamingContract(sb, cards);
-        TarotLlmSpreadContext.AppendSpreadLines(sb, cards, clientWealth);
-        AppendThemeLaneCoverageChecklist(sb, cards);
-        AppendLexicalAnchorPools(sb, cards);
+        AppendExplicitThemeNamingContract(sb, cards, spiritKnowledge);
+        TarotLlmSpreadContext.AppendSpreadLinesForSpirit(sb, cards, clientWealth, spiritKnowledge);
+        AppendThemeLaneCoverageChecklist(sb, cards, spiritKnowledge);
+        AppendLexicalAnchorPools(sb, cards, spiritKnowledge);
         return sb.ToString();
     }
 

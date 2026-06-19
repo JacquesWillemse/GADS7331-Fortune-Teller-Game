@@ -56,11 +56,27 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
-        ApplyStartingResources();
+        if (RunExperienceConfig.IsConfigured)
+            ApplyStartingResources();
         if (energyUpdate != null)
             energyUpdate.enabled = false;
         if (customerUpdate != null)
             customerUpdate.enabled = false;
+    }
+
+    void Start()
+    {
+        if (!RunExperienceConfig.IsConfigured && FindFirstObjectByType<ExperienceSelectOverlay>() == null)
+        {
+            RunExperienceConfig.Configure(RunExperienceConfig.FortuneLineage.Familiar);
+            ApplyStartingResources();
+        }
+    }
+
+    /// <summary>Called by <see cref="ExperienceSelectOverlay"/> once the player picks lineage.</summary>
+    public void ApplyExperienceStartingState()
+    {
+        ApplyStartingResources();
     }
 
     void OnDestroy()
@@ -71,11 +87,16 @@ public class GameManager : MonoBehaviour
 
     void ApplyStartingResources()
     {
-        _energy = Mathf.Clamp(startingEnergy, 0, maxEnergy);
+        int energy = RunExperienceConfig.IsConfigured
+            ? RunExperienceConfig.StartingEnergy
+            : startingEnergy;
+        _energy = Mathf.Clamp(energy, 0, maxEnergy);
         _customers = Mathf.Max(0, startingCustomers);
         _cardsDrawn = false;
         _gameComplete = false;
         wisdomBookProgress?.ResetProgress();
+        if (RunExperienceConfig.IsConfigured)
+            wisdomBookProgress?.ApplyStartingUnlocks(RunExperienceConfig.StartingBookUnlocks);
         RaiseResources();
     }
 

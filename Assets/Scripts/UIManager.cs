@@ -50,11 +50,13 @@ public class UIManager : MonoBehaviour
             clientSpawner.onClientSpawned.AddListener(OnClientSpawnedForUi);
         }
 
+        RunExperienceConfig.OnConfigured += OnExperienceConfigured;
         RefreshClientGatedButtons();
     }
 
     void OnDestroy()
     {
+        RunExperienceConfig.OnConfigured -= OnExperienceConfigured;
         if (clientSpawner != null)
         {
             clientSpawner.onClientCalledIn.RemoveListener(OnClientGateChanged);
@@ -72,9 +74,15 @@ public class UIManager : MonoBehaviour
         RefreshClientGatedButtons();
     }
 
+    void OnExperienceConfigured()
+    {
+        RefreshClientGatedButtons();
+    }
+
     void RefreshClientGatedButtons()
     {
-        bool block = clientSpawner != null && !clientSpawner.IsGameplayAllowed;
+        bool block = !RunExperienceConfig.IsConfigured
+            || (clientSpawner != null && !clientSpawner.IsGameplayAllowed);
 
         if (readFortuneBtn != null)
             readFortuneBtn.interactable = !block;

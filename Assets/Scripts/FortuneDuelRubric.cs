@@ -82,12 +82,14 @@ public static class FortuneDuelRubric
     /// <summary>Computes both sides' totals from spread data and the two readings. Moral card tilt uses printed leans; theme/alignment use reading text (include spirit's full reply, e.g. overall moral read sentence).</summary>
     /// <param name="magicalEnergy0to100">0–100 from UI; adds up to <see cref="MagicalEnergyMaxBonusPoints"/> to the player; 100 = guaranteed win (see <see cref="IsGuaranteedPlayerWin"/>).</param>
     /// <param name="clientWealth">Wealth of the seated customer — wealth-fit tokens scored on both readings.</param>
+    /// <param name="playerExperienceJudgeBias">Lineage difficulty bonus on the teller's total (see <see cref="RunExperienceConfig"/>).</param>
     public static FortuneDuelScoreBreakdown Compute(
         IReadOnlyList<TarotCardData> spread,
         string playerReading,
         string demonReading,
         float magicalEnergy0to100,
-        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor)
+        FortuneClientSpawner.WealthType clientWealth = FortuneClientSpawner.WealthType.Poor,
+        int playerExperienceJudgeBias = 0)
     {
         string pNorm = NormalizeCorpus(playerReading);
         string dNorm = NormalizeCorpus(demonReading);
@@ -130,12 +132,13 @@ public static class FortuneDuelRubric
         MoralSpreadJudgeBias(spread, out int pJudgeBias, out int dJudgeBias);
 
         int neutralBonus = ComputeNeutralSpreadTellerBonus(spread, pNorm);
-        int pTotal = magic + pMoral + pTheme + pDesc + pWealth + pAlign + pJudgeBias + neutralBonus;
+        int lineageBias = Mathf.Max(0, playerExperienceJudgeBias);
+        int pTotal = magic + pMoral + pTheme + pDesc + pWealth + pAlign + pJudgeBias + neutralBonus + lineageBias;
         int dTotal = dMoral + dTheme + dDesc + dWealth + dAlign + dJudgeBias;
 
         return new FortuneDuelScoreBreakdown(
             magic, pMoral, dMoral, pTheme, dTheme, pDesc, dDesc, pWealth, dWealth,
-            pAlign, dAlign, pJudgeBias, dJudgeBias, neutralBonus, pTotal, dTotal, clientWealth);
+            pAlign, dAlign, pJudgeBias, dJudgeBias, neutralBonus, lineageBias, pTotal, dTotal, clientWealth);
     }
 
     /// <summary>All drawn lines Neutral + teller shows real hope → small booth bonus so neutral spreads are not pure token DPS races.</summary>
@@ -202,6 +205,8 @@ public static class FortuneDuelRubric
             sb.AppendLine($"Moral judge bias (more Bad than Good on the draw): +{s.DemonSpreadMoralJudgeBias} to spirit.");
         if (s.PlayerNeutralSpreadBonus > 0)
             sb.AppendLine($"Neutral-draw booth steadiness (teller hope, all Neutral lines): +{s.PlayerNeutralSpreadBonus} to teller.");
+        if (s.PlayerExperienceJudgeBias > 0)
+            sb.AppendLine($"Lineage judge favor (opening difficulty): +{s.PlayerExperienceJudgeBias} to teller.");
         sb.AppendLine($"Theme identification (per card, max {MaxThemeIdentificationPerCard} each; abstract lane lexicon): player +{s.PlayerThemeIdentification}, spirit +{s.DemonThemeIdentification}.");
         sb.AppendLine($"Vignette echo (per card, max {MaxDescriptionEchoPerCard} each; loose keywords from card descriptions): player +{s.PlayerDescriptionEcho}, spirit +{s.DemonDescriptionEcho}.");
         sb.AppendLine($"Customer wealth fit (max {FortuneClientWealthContext.MaxWealthFit} each): player +{s.PlayerWealthFit}, spirit +{s.DemonWealthFit}.");
@@ -394,6 +399,8 @@ public readonly struct FortuneDuelScoreBreakdown
     public readonly int DemonSpreadMoralJudgeBias;
     /// <summary>Included in <see cref="PlayerTotal"/>; from all-Neutral spread + hope hits on teller text.</summary>
     public readonly int PlayerNeutralSpreadBonus;
+    /// <summary>Included in <see cref="PlayerTotal"/>; from run lineage / difficulty selection.</summary>
+    public readonly int PlayerExperienceJudgeBias;
     public readonly int PlayerTotal;
     public readonly int DemonTotal;
     public readonly FortuneClientSpawner.WealthType ClientWealth;
@@ -413,6 +420,7 @@ public readonly struct FortuneDuelScoreBreakdown
         int playerSpreadMoralJudgeBias,
         int demonSpreadMoralJudgeBias,
         int playerNeutralSpreadBonus,
+        int playerExperienceJudgeBias,
         int playerTotal,
         int demonTotal,
         FortuneClientSpawner.WealthType clientWealth)
@@ -431,6 +439,7 @@ public readonly struct FortuneDuelScoreBreakdown
         PlayerSpreadMoralJudgeBias = playerSpreadMoralJudgeBias;
         DemonSpreadMoralJudgeBias = demonSpreadMoralJudgeBias;
         PlayerNeutralSpreadBonus = playerNeutralSpreadBonus;
+        PlayerExperienceJudgeBias = playerExperienceJudgeBias;
         PlayerTotal = playerTotal;
         DemonTotal = demonTotal;
         ClientWealth = clientWealth;

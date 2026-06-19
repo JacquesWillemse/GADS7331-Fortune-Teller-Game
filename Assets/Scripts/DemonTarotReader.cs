@@ -168,7 +168,8 @@ public class DemonTarotReader : MonoBehaviour
                 s => ok = s,
                 e => err = e,
                 null,
-                ResolveClientWealth()));
+                ResolveClientWealth(),
+                RunExperienceConfig.SpiritKnowledge));
 
             if (generation != _requestGeneration)
                 yield break;

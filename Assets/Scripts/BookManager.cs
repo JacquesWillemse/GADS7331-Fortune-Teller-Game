@@ -262,8 +262,12 @@ public class BookManager : MonoBehaviour
 
     int CardCount => tarotDatabase?.cards?.Count ?? 0;
 
-    /// <summary>Nav 0 = intro spread; nav 1..N = card pair spreads.</summary>
-    int LastNavIndex => CardCount <= 0 ? 0 : (CardCount + 1) / 2;
+    const int IntroSpreadCount = 2;
+
+    int CardSpreadCount => CardCount <= 0 ? 0 : (CardCount + 1) / 2;
+
+    /// <summary>Nav 0..IntroSpreadCount-1 = intro spreads; then card pair spreads.</summary>
+    int LastNavIndex => IntroSpreadCount - 1 + CardSpreadCount;
 
     void OnNextPage()
     {
@@ -285,10 +289,10 @@ public class BookManager : MonoBehaviour
 
     void RefreshView()
     {
-        if (_navIndex == 0)
-            ShowIntroSpread();
+        if (_navIndex < IntroSpreadCount)
+            ShowIntroSpread(_navIndex);
         else
-            ShowCardSpread(_navIndex - 1);
+            ShowCardSpread(_navIndex - IntroSpreadCount);
 
         if (previousPage != null)
             previousPage.interactable = _navIndex > 0;
@@ -296,13 +300,15 @@ public class BookManager : MonoBehaviour
             nextPage.interactable = _navIndex < LastNavIndex;
     }
 
-    void ShowIntroSpread()
+    void ShowIntroSpread(int introIndex)
     {
         SetCardImagesVisible(false);
         ApplyIntroBodyLayout();
         var pages = bookPages?.pages;
-        ApplyTextPage(leftPageTitle, leftPageBody, pages, 0);
-        ApplyTextPage(rightPageTitle, rightPageBody, pages, 1);
+        int leftIndex = introIndex * 2;
+        int rightIndex = leftIndex + 1;
+        ApplyTextPage(leftPageTitle, leftPageBody, pages, leftIndex);
+        ApplyTextPage(rightPageTitle, rightPageBody, pages, rightIndex);
     }
 
     void ShowCardSpread(int pairIndex)

@@ -20,6 +20,22 @@ public class WisdomBookProgress : MonoBehaviour
         _revealedCardIndices.Clear();
     }
 
+    /// <summary>Reveal the first N pasteboard pages at run start (lineage difficulty).</summary>
+    public void ApplyStartingUnlocks(int count)
+    {
+        if (tarotDatabase?.cards == null || count <= 0)
+            return;
+
+        int n = Mathf.Min(count, tarotDatabase.cards.Count);
+        for (int i = 0; i < n; i++)
+        {
+            if (_revealedCardIndices.Contains(i))
+                continue;
+            _revealedCardIndices.Add(i);
+            onCardRevealed?.Invoke(i);
+        }
+    }
+
     public bool IsRevealed(int cardIndex)
     {
         return cardIndex >= 0 && _revealedCardIndices.Contains(cardIndex);
