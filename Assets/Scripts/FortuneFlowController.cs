@@ -24,6 +24,8 @@ public class FortuneFlowController : MonoBehaviour
     [SerializeField] private TarotCardPull cardPull;
     [Tooltip("Optional — keeps GameManager.CardsDrawn in sync and receives round reset after Accept Verdict.")]
     [SerializeField] private GameManager gameManager;
+    [Tooltip("When set, Draw Cards and the fortune flow stay locked until Call Client In finishes.")]
+    [SerializeField] private FortuneClientSpawner clientSpawner;
     [SerializeField] private DemonTarotReader spiritReader;
     [Tooltip("Same OllamaClient as the spirit reader. If empty, uses spiritReader.Ollama when available.")]
     [SerializeField] private OllamaClient ollama;
@@ -95,8 +97,28 @@ public class FortuneFlowController : MonoBehaviour
     void Start()
     {
         ApplyPlayerFortunePlaceholderHint();
-        RefreshDrawCardsButtonInteractable();
-        RefreshRenderVerdictButtonInteractable();
+        if (clientSpawner != null)
+            clientSpawner.onClientCalledIn.AddListener(OnClientCalledIn);
+        RefreshGameplayInteractables();
+    }
+
+    void OnDestroy()
+    {
+        if (clientSpawner != null)
+            clientSpawner.onClientCalledIn.RemoveListener(OnClientCalledIn);
+        if (_verdictProseCoroutine != null)
+            StopCoroutine(_verdictProseCoroutine);
+        if (cardPull != null)
+            cardPull.onCardPullComplete.RemoveListener(OnCardPullComplete);
+        if (spiritReader != null)
+            spiritReader.onResponseText.RemoveListener(OnSpiritResponseText);
+        if (magicalEnergySlider != null)
+            magicalEnergySlider.onValueChanged.RemoveListener(OnMagicalEnergySliderChanged);
+    }
+
+    void OnClientCalledIn()
+    {
+        RefreshGameplayInteractables();
     }
 
     void Awake()
@@ -121,18 +143,6 @@ public class FortuneFlowController : MonoBehaviour
             spiritReader.onResponseText.AddListener(OnSpiritResponseText);
     }
 
-    void OnDestroy()
-    {
-        if (_verdictProseCoroutine != null)
-            StopCoroutine(_verdictProseCoroutine);
-        if (cardPull != null)
-            cardPull.onCardPullComplete.RemoveListener(OnCardPullComplete);
-        if (spiritReader != null)
-            spiritReader.onResponseText.RemoveListener(OnSpiritResponseText);
-        if (magicalEnergySlider != null)
-            magicalEnergySlider.onValueChanged.RemoveListener(OnMagicalEnergySliderChanged);
-    }
-
     void OnSpiritResponseText(string text)
     {
         WriteTmp(spiritFortuneOutput, text, nameof(FortuneFlowController));
@@ -155,13 +165,18 @@ public class FortuneFlowController : MonoBehaviour
         gameManager?.SetCardsDrawn(true);
         LogFlow(outputStrings != null ? outputStrings.logCardsReady : null);
         TryBeginSpiritReadingIfNeeded();
-        RefreshDrawCardsButtonInteractable();
-        RefreshRenderVerdictButtonInteractable();
+        RefreshGameplayInteractables();
     }
 
     /// <summary>Wired to Draw Cards button. One pull per round; draw stays disabled until Accept Verdict.</summary>
     public void OnDrawCards()
     {
+        if (IsClientBlockingGameplay())
+        {
+            LogCallClientInFirst();
+            return;
+        }
+
         if (cardPull == null)
         {
             LogFlow(outputStrings != null ? outputStrings.logAssignCardPull : null);
@@ -179,7 +194,7 @@ public class FortuneFlowController : MonoBehaviour
         spiritReader?.CancelActiveReading();
 
         _drawCardsAllowed = false;
-        RefreshDrawCardsButtonInteractable();
+        RefreshGameplayInteractables();
 
         RefundCommittedMagicalEnergyIfAny();
         _cardsDrawn = false;
@@ -194,13 +209,18 @@ public class FortuneFlowController : MonoBehaviour
         cardPull.ClearPullHistory();
         cardPull.CardPull();
         LogFlow(outputStrings != null ? outputStrings.logDrawing : null);
-        RefreshDrawCardsButtonInteractable();
-        RefreshRenderVerdictButtonInteractable();
+        RefreshGameplayInteractables();
     }
 
     /// <summary>Wired to Read Fortune — fills the player output (and optionally the judge mirror). No verdict.</summary>
     public void OnReadFortune()
     {
+        if (IsClientBlockingGameplay())
+        {
+            LogCallClientInFirst();
+            return;
+        }
+
         string t = playerFortuneInput != null ? playerFortuneInput.text?.Trim() ?? "" : "";
         if (string.IsNullOrEmpty(t))
         {
@@ -223,7 +243,7 @@ public class FortuneFlowController : MonoBehaviour
         if (judgeOutput != null && outputStrings != null && !string.IsNullOrEmpty(outputStrings.judgeMirrorPlayerOnReadFormat))
             WriteTmp(judgeOutput, SafeFormat(outputStrings.judgeMirrorPlayerOnReadFormat, t), nameof(FortuneFlowController));
         LogFlow(outputStrings != null ? outputStrings.logAfterReadFortune : null);
-        RefreshRenderVerdictButtonInteractable();
+        RefreshGameplayInteractables();
     }
 
     /// <summary>Call when the Cards or Spirit view opens. Starts the spirit if cards are drawn but the request has not run yet.</summary>
@@ -272,6 +292,12 @@ public class FortuneFlowController : MonoBehaviour
     /// <summary>Wired to a button on the Judge panel (e.g. "Render Verdict"). Uses player fortune, spirit output, and magical energy.</summary>
     public void RenderVerdict()
     {
+        if (IsClientBlockingGameplay())
+        {
+            LogCallClientInFirst();
+            return;
+        }
+
         if (_verdictProseInFlight)
         {
             LogFlow("Verdict prose is still being written…");
@@ -476,8 +502,8 @@ public class FortuneFlowController : MonoBehaviour
         cardPull?.HideCards();
         spiritReader?.CancelActiveReading();
         ResetMagicalEnergySliderForNewReading();
-        RefreshDrawCardsButtonInteractable();
-        RefreshRenderVerdictButtonInteractable();
+        clientSpawner?.SpawnClient();
+        RefreshGameplayInteractables();
     }
 
     void RefundCommittedMagicalEnergyIfAny()
@@ -488,18 +514,50 @@ public class FortuneFlowController : MonoBehaviour
         _committedMagicalEnergyForDuel = 0;
     }
 
+    bool IsClientBlockingGameplay()
+    {
+        return clientSpawner != null && !clientSpawner.IsGameplayAllowed;
+    }
+
+    void LogCallClientInFirst()
+    {
+        LogFlow(!string.IsNullOrEmpty(outputStrings?.logCallClientInFirst)
+            ? outputStrings.logCallClientInFirst
+            : "Call the client in before starting the reading.");
+    }
+
+    void RefreshGameplayInteractables()
+    {
+        RefreshDrawCardsButtonInteractable();
+        RefreshRenderVerdictButtonInteractable();
+        RefreshPlayerFortuneInputInteractable();
+    }
+
+    /// <summary>Called by UI when the client call-in gate changes.</summary>
+    public void RefreshGameplayGates()
+    {
+        RefreshGameplayInteractables();
+    }
+
     void RefreshDrawCardsButtonInteractable()
     {
         if (drawCardsButton == null)
             return;
-        drawCardsButton.interactable = _drawCardsAllowed;
+        drawCardsButton.interactable = _drawCardsAllowed && !IsClientBlockingGameplay();
+    }
+
+    void RefreshPlayerFortuneInputInteractable()
+    {
+        if (playerFortuneInput == null)
+            return;
+        playerFortuneInput.interactable = !IsClientBlockingGameplay();
     }
 
     void RefreshRenderVerdictButtonInteractable()
     {
         if (renderVerdictButton != null)
         {
-            if (_verdictAwaitingAccept || _verdictProseInFlight)
+            if (_verdictAwaitingAccept || _verdictProseInFlight || IsClientBlockingGameplay())
                 renderVerdictButton.interactable = false;
             else
             {
@@ -706,6 +764,7 @@ public class FortuneFlowOutputStrings
 
     [Header("Flow log strings (console only)")]
     [TextArea(1, 3)] public string logDrawing;
+    [TextArea(1, 3)] public string logCallClientInFirst;
     [TextArea(1, 3)] public string logDrawLockedUntilVerdict;
     [TextArea(1, 3)] public string logCardsReady;
     [TextArea(1, 3)] public string logAssignCardPull;

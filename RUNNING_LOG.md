@@ -1,5 +1,17 @@
 # Running Log
 
+## 2026-05-15
+
+### Documentation (course standard package)
+- Added `HIGH_CONCEPT.md`, `ollama-plan.md`, `setup.md`, `refinements-changes.md`.
+- Rewrote `README.md` for MainMenu → MainScene, `FortuneFlowController`, rubric + judge prose.
+- Updated `PLAN.md` current state and doc index; `requirements.txt` judge section.
+
+### Gameplay (same period — see `refinements-changes.md`)
+- Spirit on draw; judge prose LLM; MainMenu; outline parser hardening; book UI; accept-button gating.
+
+---
+
 ## 2026-05-09
 
 ### Session Summary

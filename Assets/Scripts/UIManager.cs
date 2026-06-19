@@ -6,6 +6,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private CameraManager cameraManager;
     [SerializeField] private FortuneFlowController fortuneFlow;
     [SerializeField] private GameManager gameManager;
+    [Tooltip("When set, Draw / Read stay disabled until the client is called to the table.")]
+    [SerializeField] private FortuneClientSpawner clientSpawner;
 
     [SerializeField] private Button drawCardsBtn;
     [SerializeField] private Button readFortuneBtn;
@@ -41,6 +43,52 @@ public class UIManager : MonoBehaviour
             renderJudgementBtn.onClick.AddListener(RenderJudgementPressed);
         if (acceptJudgementBtn != null)
             acceptJudgementBtn.onClick.AddListener(AcceptJudgementPressed);
+
+        if (clientSpawner != null)
+        {
+            clientSpawner.onClientCalledIn.AddListener(OnClientGateChanged);
+            clientSpawner.onClientSpawned.AddListener(OnClientSpawnedForUi);
+        }
+
+        RefreshClientGatedButtons();
+    }
+
+    void OnDestroy()
+    {
+        if (clientSpawner != null)
+        {
+            clientSpawner.onClientCalledIn.RemoveListener(OnClientGateChanged);
+            clientSpawner.onClientSpawned.RemoveListener(OnClientSpawnedForUi);
+        }
+    }
+
+    void OnClientGateChanged()
+    {
+        RefreshClientGatedButtons();
+    }
+
+    void OnClientSpawnedForUi(FortuneClientSpawner.WealthType _)
+    {
+        RefreshClientGatedButtons();
+    }
+
+    void RefreshClientGatedButtons()
+    {
+        bool block = clientSpawner != null && !clientSpawner.IsGameplayAllowed;
+
+        if (readFortuneBtn != null)
+            readFortuneBtn.interactable = !block;
+
+        if (block)
+        {
+            if (drawCardsBtn != null)
+                drawCardsBtn.interactable = false;
+            if (renderJudgementBtn != null)
+                renderJudgementBtn.interactable = false;
+            return;
+        }
+
+        fortuneFlow?.RefreshGameplayGates();
     }
 
     void DrawCardsPressed()

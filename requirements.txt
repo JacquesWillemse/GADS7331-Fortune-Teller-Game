@@ -1,5 +1,5 @@
 # Fortune Teller Game Requirements Baseline
-# Last updated: 2026-05-11 (two-pass demon; sync with README / PLAN / RUNNING_LOG)
+# Last updated: 2026-05-15 (FortuneFlowController, judge prose, spirit on draw; see refinements-changes.md)
 
 [Game Design Requirements]
 - Theme: carnival fortune telling with supernatural demon interference
@@ -14,9 +14,10 @@
   - Demon AI gives negative interpretation
   - If player response is negative, demon agrees and judge phase is skipped
   - Demon delivery (prototype): optional two-pass generation — (1) structured JSON outline validated in-game, (2) spoken curse bound to that outline; if outline is missing or invalid, fall back to single-pass demon prompt (no hard failure)
-- Judge system:
-  - Judge AI receives cards + player response + demon response + customer context
-  - Judge returns winner and rationale
+- Judge system (shipped prototype):
+  - Winner decided by deterministic FortuneDuelRubric (word lists, card morals, themes, magical energy)
+  - Optional Ollama pass writes tent verdict prose only (does not change winner)
+  - Legacy JSON judge available in TarotReadingDuelPipeline for experiments
 
 [Gameplay Systems]
 - Fortune teller reading loop
